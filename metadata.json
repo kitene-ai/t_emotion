@@ -1,0 +1,6 @@
+{
+  "name": "교사 연수 감정판",
+  "description": "교사 연수 중 교사들의 실시간 감정을 기록하고 확인할 수 있으며, 구글 시트에 날짜별 감정 이력을 보관하는 교사 감정 대시보드",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
