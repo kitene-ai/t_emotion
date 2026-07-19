@@ -65,14 +65,14 @@ export default function SettingsModal({
     const parsedNames = rawLines
       .map(name => name.trim())
       .filter(name => name.length > 0)
-      .slice(0, 30); // Max 30 teachers
+      .slice(0, 150); // Max 150 teachers
 
     onSaveTeachers(parsedNames);
     setTeachersCount(parsedNames.length);
     setNamesText(parsedNames.join('\n'));
     
     // Show a temporary success style or close
-    alert('교사 명단이 성공적으로 저장되었습니다! (최대 30명)');
+    alert('교사 명단이 성공적으로 저장되었습니다! (최대 150명)');
   };
 
   // Preset template names
@@ -240,7 +240,7 @@ export default function SettingsModal({
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <label className="block text-sm font-bold text-natural-text">
-                  연수 참여 교사 명단 (최대 30명)
+                  연수 참여 교사 명단 (최대 150명)
                 </label>
                 <button
                   id="preset_names_btn"
@@ -252,7 +252,7 @@ export default function SettingsModal({
               </div>
 
               <p className="text-xs text-natural-text/60 leading-relaxed">
-                한 줄에 한 명씩 이름을 작성해주세요. 최대 30명까지 입력할 수 있습니다. 
+                한 줄에 한 명씩 이름을 작성해주세요. 최대 150명까지 입력할 수 있습니다. 
                 예쁘게 정렬된 교사 명단을 바탕으로 감정을 체크할 수 있는 전광판이 생성됩니다.
               </p>
 
@@ -270,14 +270,14 @@ export default function SettingsModal({
                   className="w-full p-4 border border-natural-border rounded-xl focus:outline-none focus:ring-2 focus:ring-natural-sage font-sans text-sm leading-relaxed text-natural-text bg-natural-bg focus:bg-white transition-all"
                 />
                 <div className="absolute bottom-3 right-3 bg-natural-olive text-white text-[11px] font-mono px-2 py-1 rounded-md opacity-80">
-                  {teachersCount} / 30명
+                  {teachersCount} / 150명
                 </div>
               </div>
 
-              {teachersCount > 30 && (
+              {teachersCount > 150 && (
                 <div className="flex items-center gap-2 text-rose-600 text-xs bg-rose-50 p-2.5 rounded-lg border border-rose-100">
                   <AlertCircle size={14} className="shrink-0" />
-                  <span>최대 30명까지만 적용됩니다. 현재 초과된 명단은 저장 시 잘립니다.</span>
+                  <span>최대 150명까지만 적용됩니다. 현재 초과된 명단은 저장 시 잘립니다.</span>
                 </div>
               )}
 
