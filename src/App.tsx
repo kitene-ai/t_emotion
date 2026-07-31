@@ -90,7 +90,27 @@ export default function App() {
     if (urlRoster && urlRoster.length > 0) {
       localStorage.setItem('emotion_board_teacher_names', JSON.stringify(urlRoster));
       saveRosterToCloud(urlRoster);
+      setTeachers(urlRoster.map((name, index) => ({
+        id: `teacher_${index}_${name}`,
+        name
+      })));
     } else {
+      // First check localStorage for quick display
+      const storedNamesStr = localStorage.getItem('emotion_board_teacher_names');
+      if (storedNamesStr) {
+        try {
+          const storedNames = JSON.parse(storedNamesStr);
+          if (Array.isArray(storedNames) && storedNames.length > 0) {
+            setTeachers(storedNames.map((name: string, index: number) => ({
+              id: `teacher_${index}_${name}`,
+              name
+            })));
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       // Fetch cloud roster immediately so new users/devices see the shared list
       getSharedRosterFromCloud().then((cloudNames) => {
         if (cloudNames && cloudNames.length > 0) {
@@ -106,6 +126,15 @@ export default function App() {
               };
             });
           });
+        } else {
+          // If no cloud roster exists yet, upload default teachers to cloud so everyone gets synced
+          const storedNamesStr = localStorage.getItem('emotion_board_teacher_names');
+          const initialNames = storedNamesStr ? JSON.parse(storedNamesStr) : DEFAULT_TEACHERS;
+          saveRosterToCloud(initialNames);
+          setTeachers(initialNames.map((name: string, index: number) => ({
+            id: `teacher_${index}_${name}`,
+            name
+          })));
         }
       });
     }
@@ -183,8 +212,20 @@ export default function App() {
       // otherwise fallback to localStorage or default
       let namesToUse = prevTeachers.map((t) => t.name);
       if (namesToUse.length === 0) {
-        const storedNames = localStorage.getItem('emotion_board_teacher_names');
-        namesToUse = storedNames ? JSON.parse(storedNames) : DEFAULT_TEACHERS;
+        const storedNamesStr = localStorage.getItem('emotion_board_teacher_names');
+        if (storedNamesStr) {
+          try {
+            const parsed = JSON.parse(storedNamesStr);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              namesToUse = parsed;
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+      if (namesToUse.length === 0) {
+        namesToUse = DEFAULT_TEACHERS;
       }
 
       return namesToUse.map((name: string, index: number) => {
