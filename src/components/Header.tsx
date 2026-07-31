@@ -9,6 +9,7 @@ interface HeaderProps {
   googleUser: User | null;
   onOpenSettings: () => void;
   onShareLink: () => void;
+  onGoHome?: () => void;
 }
 
 export default function Header({
@@ -18,16 +19,22 @@ export default function Header({
   googleUser,
   onOpenSettings,
   onShareLink,
+  onGoHome,
 }: HeaderProps) {
   return (
     <header className="w-full bg-white border-b border-natural-border py-4 px-6 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-      {/* App Logo & Title */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-natural-sage flex items-center justify-center text-xl shadow-sm text-white font-bold">
+      {/* App Logo & Title (Clickable Home Button) */}
+      <div
+        id="header_home_logo_btn"
+        onClick={onGoHome}
+        className="flex items-center gap-3 cursor-pointer group hover:opacity-90 transition-all text-left"
+        title="첫 화면으로 이동 (선택 해제 및 맨 위로)"
+      >
+        <div className="w-10 h-10 rounded-full bg-natural-sage flex items-center justify-center text-xl shadow-sm text-white font-bold group-hover:scale-105 transition-transform">
           🏫
         </div>
         <div className="text-left">
-          <h1 className="text-xl font-bold text-natural-olive tracking-tight flex items-center gap-1.5">
+          <h1 className="text-xl font-bold text-natural-olive tracking-tight flex items-center gap-1.5 group-hover:text-natural-deep-green transition-colors">
             오늘의 연수 온도 : <span className="text-natural-sand font-extrabold">교사용 감정판</span>
           </h1>
           <p className="text-xs text-natural-text/70 font-medium">

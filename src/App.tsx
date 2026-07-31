@@ -468,6 +468,11 @@ export default function App() {
     });
   };
 
+  const handleGoHome = () => {
+    setSelectedTeacherId(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const getFormattedDateWithDay = (dateStr: string) => {
     if (!dateStr) return '';
     try {
@@ -489,6 +494,7 @@ export default function App() {
         googleUser={googleUser}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onShareLink={handleShareLink}
+        onGoHome={handleGoHome}
       />
 
       {/* Main Board Section */}
