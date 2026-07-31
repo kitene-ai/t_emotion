@@ -22,22 +22,31 @@ export default function TeacherList({
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'unchecked' | 'checked'>('all');
 
-  // Find emotion helper
-  const getTeacherEmotion = (emotionId?: string): Emotion | undefined => {
-    if (!emotionId) return undefined;
-    return EMOTIONS.find((e) => e.id === emotionId);
+  // Find emotions helper
+  const getTeacherEmotions = (teacher: Teacher): Emotion[] => {
+    const ids = teacher.emotionIds && teacher.emotionIds.length > 0
+      ? teacher.emotionIds
+      : (teacher.currentEmotionId ? [teacher.currentEmotionId] : []);
+
+    return ids
+      .map((id) => EMOTIONS.find((e) => e.id === id))
+      .filter((e): e is Emotion => e !== undefined);
   };
 
   const filteredTeachers = teachers.filter((t) => {
     const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const hasEmotion = Boolean(t.currentEmotionId || t.customNote);
+    const teacherEmotions = getTeacherEmotions(t);
+    const hasEmotion = teacherEmotions.length > 0 || Boolean(t.customNote);
     if (!matchesSearch) return false;
     if (statusFilter === 'unchecked') return !hasEmotion;
     if (statusFilter === 'checked') return hasEmotion;
     return true;
   });
 
-  const checkedCount = teachers.filter((t) => t.currentEmotionId || t.customNote).length;
+  const checkedCount = teachers.filter((t) => {
+    const teacherEmotions = getTeacherEmotions(t);
+    return teacherEmotions.length > 0 || Boolean(t.customNote);
+  }).length;
   const totalCount = teachers.length;
 
   const handleTeacherClick = (teacherId: string) => {
@@ -129,8 +138,9 @@ export default function TeacherList({
         ) : (
           <div className="grid grid-cols-1 gap-2">
             {filteredTeachers.map((teacher) => {
-              const emotion = getTeacherEmotion(teacher.currentEmotionId);
+              const emotions = getTeacherEmotions(teacher);
               const isSelected = selectedTeacherId === teacher.id;
+              const hasEmotions = emotions.length > 0;
 
               return (
                 <div
@@ -149,7 +159,7 @@ export default function TeacherList({
                       className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
                         isSelected
                           ? 'bg-natural-sage text-white'
-                          : emotion
+                          : hasEmotions
                           ? 'bg-natural-light-sage text-natural-deep-green'
                           : 'bg-natural-soft-bg text-natural-text/60'
                       }`}
@@ -158,7 +168,7 @@ export default function TeacherList({
                     </div>
                     
                     <div className="min-w-0 flex-1 text-left">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-bold text-sm text-natural-text truncate">
                           {teacher.name}
                         </span>
@@ -170,12 +180,19 @@ export default function TeacherList({
                       </div>
                       
                       {/* Emotion & Custom Note description */}
-                      {emotion || teacher.customNote ? (
-                        <div className="flex flex-col gap-0.5 mt-0.5">
-                          {emotion && (
-                            <div className="flex items-center gap-1 text-xs text-natural-deep-green font-semibold truncate">
-                              <span className="text-sm shrink-0">{emotion.emoji}</span>
-                              <span className="truncate">{emotion.title}</span>
+                      {hasEmotions || teacher.customNote ? (
+                        <div className="flex flex-col gap-1 mt-1">
+                          {hasEmotions && (
+                            <div className="flex items-center gap-1 flex-wrap text-xs text-natural-deep-green font-semibold">
+                              {emotions.map((em) => (
+                                <span
+                                  key={em.id}
+                                  className="inline-flex items-center gap-0.5 bg-natural-light-sage/60 px-1.5 py-0.5 rounded-md border border-natural-sage/20 text-[11px]"
+                                >
+                                  <span>{em.emoji}</span>
+                                  <span>{em.title}</span>
+                                </span>
+                              ))}
                             </div>
                           )}
                           {teacher.customNote && (
@@ -195,7 +212,7 @@ export default function TeacherList({
                   </div>
 
                   {/* Right: Reset Button (only if check existing) */}
-                  {(emotion || teacher.customNote) && (
+                  {(hasEmotions || teacher.customNote) && (
                     <button
                       id={`reset_teacher_emotion_${teacher.id}`}
                       onClick={(e) => {

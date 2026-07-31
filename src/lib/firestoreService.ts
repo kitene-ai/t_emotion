@@ -100,7 +100,7 @@ export function subscribeRosterFromCloud(onUpdate: (names: string[]) => void) {
 export async function saveDailyStateToCloud(
   date: string,
   teacherName: string,
-  state: { emotionId?: string; customNote?: string }
+  state: { emotionId?: string; emotionIds?: string[]; customNote?: string }
 ): Promise<boolean> {
   try {
     const docRef = doc(db, 'daily_boards', date);
@@ -109,6 +109,7 @@ export async function saveDailyStateToCloud(
       {
         [teacherName]: {
           emotionId: state.emotionId || null,
+          emotionIds: state.emotionIds || (state.emotionId ? [state.emotionId] : []),
           customNote: state.customNote || null,
           updatedAt: new Date().toISOString()
         }
@@ -125,20 +126,21 @@ export async function saveDailyStateToCloud(
 // 4. Subscribe to daily board changes in real-time
 export function subscribeDailyBoardFromCloud(
   date: string,
-  onUpdate: (stateMap: Record<string, { emotionId?: string; customNote?: string }>) => void
+  onUpdate: (stateMap: Record<string, { emotionId?: string; emotionIds?: string[]; customNote?: string }>) => void
 ) {
   try {
     const docRef = doc(db, 'daily_boards', date);
     return onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const rawData = docSnap.data();
-        const stateMap: Record<string, { emotionId?: string; customNote?: string }> = {};
+        const stateMap: Record<string, { emotionId?: string; emotionIds?: string[]; customNote?: string }> = {};
         
         Object.keys(rawData).forEach((key) => {
           const val = rawData[key];
           if (val && typeof val === 'object') {
             stateMap[key] = {
               emotionId: val.emotionId || undefined,
+              emotionIds: Array.isArray(val.emotionIds) ? val.emotionIds : (val.emotionId ? [val.emotionId] : []),
               customNote: val.customNote || undefined
             };
           }

@@ -6,7 +6,7 @@ import { Smile, AlertCircle, Sparkles, MessageSquarePlus, Send } from 'lucide-re
 interface EmotionBoardProps {
   selectedTeacherId: string | null;
   teachers: Teacher[];
-  onSelectEmotion: (emotionId?: string, customNote?: string) => void;
+  onSelectEmotion: (emotionIds: string[], customNote?: string) => void;
 }
 
 type CategoryFilter = 'all' | 'positive' | 'exhausted' | 'funny' | 'realistic' | 'focused';
@@ -20,6 +20,11 @@ export default function EmotionBoard({
   const [noteInput, setNoteInput] = useState<string>('');
 
   const selectedTeacher = teachers.find((t) => t.id === selectedTeacherId);
+
+  // Current selected emotion IDs array
+  const currentSelectedIds: string[] = selectedTeacher?.emotionIds 
+    ? selectedTeacher.emotionIds 
+    : (selectedTeacher?.currentEmotionId ? [selectedTeacher.currentEmotionId] : []);
 
   // Sync note input with selected teacher's custom note
   useEffect(() => {
@@ -36,12 +41,22 @@ export default function EmotionBoard({
 
   const handleSaveNoteOnly = () => {
     if (!selectedTeacherId) return;
-    onSelectEmotion(selectedTeacher?.currentEmotionId, noteInput.trim());
+    onSelectEmotion(currentSelectedIds, noteInput.trim());
   };
 
   const handleCardClick = (emotionId: string) => {
     if (!selectedTeacherId) return;
-    onSelectEmotion(emotionId, noteInput.trim());
+    
+    let newSelectedIds: string[];
+    if (currentSelectedIds.includes(emotionId)) {
+      // Toggle OFF: remove from list
+      newSelectedIds = currentSelectedIds.filter((id) => id !== emotionId);
+    } else {
+      // Toggle ON: add to list
+      newSelectedIds = [...currentSelectedIds, emotionId];
+    }
+    
+    onSelectEmotion(newSelectedIds, noteInput.trim());
   };
 
   return (
@@ -57,23 +72,40 @@ export default function EmotionBoard({
           오늘 나의 위트 만점 감정 & 주관식 한마디
         </h3>
         <p className="text-[11px] sm:text-xs text-natural-text/70 mt-0.5">
-          현재 나의 기분 이모티콘을 선택하거나 나만의 주관식 상태 한마디를 직접 작성하세요!
+          여러 개의 감정을 자유롭게 고를 수 있습니다! (터치하여 추가/해제 가능)
         </p>
       </div>
 
       {/* Target Teacher Prompt banner */}
       <div className="mb-3 sm:mb-4">
         {selectedTeacher ? (
-          <div className="flex items-center gap-2.5 p-3 bg-natural-light-sage/40 border border-natural-sage/30 rounded-xl text-left animate-fade-in">
-            <span className="text-lg sm:text-xl">👉</span>
-            <div>
-              <div className="text-xs font-bold text-natural-deep-green">
-                <span className="text-natural-deep-green underline decoration-natural-sand font-extrabold text-sm">{selectedTeacher.name} 선생님</span>의 상태/감정을 체크하는 중입니다.
+          <div className="flex items-center gap-2.5 p-3 bg-natural-light-sage/40 border border-natural-sage/30 rounded-xl text-left animate-fade-in justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="text-lg sm:text-xl">👉</span>
+              <div>
+                <div className="text-xs font-bold text-natural-deep-green">
+                  <span className="text-natural-deep-green underline decoration-natural-sand font-extrabold text-sm">{selectedTeacher.name} 선생님</span>의 감정을 선택하는 중입니다.
+                </div>
+                <p className="text-[10px] text-natural-text/60 mt-0.5">
+                  감정 이모티콘을 터치하면 여러 개를 동시에 등록하거나 취소할 수 있습니다.
+                </p>
               </div>
-              <p className="text-[10px] text-natural-text/60 mt-0.5">
-                주관식 한마디를 적거나 아래 이모지를 누르면 감정이 바로 기록됩니다.
-              </p>
             </div>
+            {currentSelectedIds.length > 0 && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[11px] font-bold bg-natural-sand text-white px-2.5 py-1 rounded-full shadow-xs">
+                  {currentSelectedIds.length}개 선택됨
+                </span>
+                <button
+                  id="deselect_all_emotions_btn"
+                  onClick={() => onSelectEmotion([], noteInput.trim())}
+                  className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded-full transition-colors cursor-pointer"
+                  title="선택한 감정 모두 해제"
+                >
+                  선택 해제 ✕
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2.5 p-3 bg-natural-soft-bg/50 border border-natural-border rounded-xl text-left">
@@ -170,6 +202,7 @@ export default function EmotionBoard({
           {filteredEmotions.map((emotion) => {
             const categoryStyle = CATEGORIES[emotion.category];
             const isSelectable = !!selectedTeacherId;
+            const isSelected = currentSelectedIds.includes(emotion.id);
 
             return (
               <button
@@ -182,16 +215,16 @@ export default function EmotionBoard({
                     ? 'hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-sm hover:shadow-md'
                     : 'opacity-55 cursor-not-allowed'
                 } ${categoryStyle.bg} ${
-                  selectedTeacher?.currentEmotionId === emotion.id
-                    ? 'ring-2 ring-natural-sand border-natural-sand shadow-inner bg-white'
+                  isSelected
+                    ? 'ring-2 ring-natural-sand border-natural-sand shadow-inner bg-white font-bold'
                     : 'border-transparent'
                 }`}
-                title={isSelectable ? `${emotion.title} 선택` : '선생님 이름을 먼저 선택하세요'}
+                title={isSelectable ? `${emotion.title} ${isSelected ? '해제' : '선택'}` : '선생님 이름을 먼저 선택하세요'}
               >
-                {/* Visual Sparkle decoration on active selection */}
-                {selectedTeacher?.currentEmotionId === emotion.id && (
-                  <span className="absolute top-1.5 right-1.5 text-natural-sand animate-spin">
-                    <Sparkles size={12} />
+                {/* Visual Sparkle or Check decoration on active selection */}
+                {isSelected && (
+                  <span className="absolute top-1.5 right-1.5 w-5 h-5 bg-natural-sand text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs animate-scale-in">
+                    ✓
                   </span>
                 )}
 
@@ -202,7 +235,9 @@ export default function EmotionBoard({
 
                 {/* Title and Situational Wit Context */}
                 <div className="min-w-0 flex-1">
-                  <h4 className="text-[11px] sm:text-xs font-bold text-natural-text group-hover:text-natural-olive transition-colors leading-snug">
+                  <h4 className={`text-[11px] sm:text-xs font-bold leading-snug transition-colors ${
+                    isSelected ? 'text-natural-deep-green' : 'text-natural-text group-hover:text-natural-olive'
+                  }`}>
                     {emotion.title}
                   </h4>
                   <p className="text-[9px] sm:text-[10px] text-natural-text/60 group-hover:text-natural-text/80 transition-colors mt-0.5 font-medium leading-tight line-clamp-2">

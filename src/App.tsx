@@ -5,7 +5,7 @@ import EmotionBoard from './components/EmotionBoard';
 import SettingsModal from './components/SettingsModal';
 import ShareModal from './components/ShareModal';
 import RecentActivity from './components/RecentActivity';
-import { Teacher, SheetConfig, LogItem } from './types';
+import { Teacher, Emotion, SheetConfig, LogItem } from './types';
 import { EMOTIONS } from './data/emotions';
 import { initAuth, googleSignIn } from './lib/firebase';
 import { appendEmotionRecord, sendToGasWebhook } from './lib/sheets';
@@ -234,13 +234,16 @@ export default function App() {
           return {
             id: `teacher_${index}_${name}`,
             name,
-            currentEmotionId: item
+            currentEmotionId: item,
+            emotionIds: [item]
           };
         } else if (item && typeof item === 'object') {
+          const emotionIds = item.emotionIds || (item.emotionId ? [item.emotionId] : []);
           return {
             id: `teacher_${index}_${name}`,
             name,
-            currentEmotionId: item.emotionId,
+            currentEmotionId: item.emotionId || emotionIds[0],
+            emotionIds: emotionIds,
             customNote: item.customNote
           };
         }
@@ -271,9 +274,11 @@ export default function App() {
         return prevTeachers.map((t) => {
           const cloudItem = cloudStateMap[t.name];
           if (cloudItem) {
+            const cloudEmotionIds = cloudItem.emotionIds || (cloudItem.emotionId ? [cloudItem.emotionId] : []);
             return {
               ...t,
-              currentEmotionId: cloudItem.emotionId !== undefined ? cloudItem.emotionId : t.currentEmotionId,
+              currentEmotionId: cloudItem.emotionId !== undefined ? cloudItem.emotionId : cloudEmotionIds[0],
+              emotionIds: cloudEmotionIds,
               customNote: cloudItem.customNote !== undefined ? cloudItem.customNote : t.customNote
             };
           }
@@ -359,20 +364,34 @@ export default function App() {
   };
 
   // 4. Update Emotion / Custom Note Event Handler
-  const handleSelectEmotion = async (emotionId?: string, customNote?: string) => {
+  const handleSelectEmotion = async (emotionInput?: string | string[], customNote?: string) => {
     if (!selectedTeacherId) return;
 
     const teacher = teachers.find(t => t.id === selectedTeacherId);
     if (!teacher) return;
 
-    const emotion = emotionId ? EMOTIONS.find(e => e.id === emotionId) : undefined;
+    // Normalize emotionIds
+    let emotionIds: string[];
+    if (Array.isArray(emotionInput)) {
+      emotionIds = emotionInput;
+    } else if (typeof emotionInput === 'string' && emotionInput) {
+      emotionIds = [emotionInput];
+    } else {
+      emotionIds = [];
+    }
+
+    const currentEmotionId = emotionIds.length > 0 ? emotionIds[0] : undefined;
+    const selectedEmotions = emotionIds
+      .map(id => EMOTIONS.find(e => e.id === id))
+      .filter((e): e is Emotion => e !== undefined);
 
     // A. Update local teachers state
     const updatedTeachers = teachers.map(t => {
       if (t.id === selectedTeacherId) {
         return {
           ...t,
-          currentEmotionId: emotionId !== undefined ? emotionId : t.currentEmotionId,
+          currentEmotionId,
+          emotionIds,
           customNote: customNote !== undefined ? customNote : t.customNote
         };
       }
@@ -381,11 +400,13 @@ export default function App() {
     setTeachers(updatedTeachers);
 
     // B. Save today's map to localStorage & Firestore Cloud
-    const stateMap: Record<string, { emotionId?: string; customNote?: string }> = {};
+    const stateMap: Record<string, { emotionId?: string; emotionIds?: string[]; customNote?: string }> = {};
     updatedTeachers.forEach(t => {
-      if (t.currentEmotionId || t.customNote) {
+      const ids = t.emotionIds && t.emotionIds.length > 0 ? t.emotionIds : (t.currentEmotionId ? [t.currentEmotionId] : []);
+      if (ids.length > 0 || t.customNote) {
         stateMap[t.name] = {
           emotionId: t.currentEmotionId,
+          emotionIds: ids,
           customNote: t.customNote
         };
       }
@@ -394,7 +415,8 @@ export default function App() {
 
     // Save to Firestore cloud database in real-time
     saveDailyStateToCloud(selectedDate, teacher.name, {
-      emotionId,
+      emotionId: currentEmotionId,
+      emotionIds,
       customNote
     });
 
@@ -407,8 +429,12 @@ export default function App() {
       hour12: false
     });
 
-    const emoji = emotion ? emotion.emoji : '✍️';
-    const emotionTitle = emotion ? emotion.title : '주관식 한마디 기록';
+    const emoji = selectedEmotions.length > 0
+      ? selectedEmotions.map(e => e.emoji).join(' ')
+      : (customNote ? '✍️' : '❌');
+    const emotionTitle = selectedEmotions.length > 0
+      ? selectedEmotions.map(e => e.title).join(', ')
+      : (customNote ? '주관식 한마디 기록' : '선택 해제됨');
 
     const newLogItem: LogItem = {
       id: `log_${Date.now()}_${teacher.name}`,
@@ -423,9 +449,11 @@ export default function App() {
     setRecentLogs(updatedLogs);
     localStorage.setItem(`emotion_board_logs_${selectedDate}`, JSON.stringify(updatedLogs));
 
-    let description = emotion ? emotion.description : '';
+    let description = selectedEmotions.map(e => `${e.title}(${e.description})`).join(' / ');
     if (customNote) {
       description = description ? `${description} (주관식: ${customNote})` : `주관식: ${customNote}`;
+    } else if (selectedEmotions.length === 0) {
+      description = '감정 선택이 해제(삭제) 되었습니다.';
     }
 
     // D. Sync to Google Sheets via GAS Web App (works for ALL participants on mobile/web without login!)
@@ -443,7 +471,7 @@ export default function App() {
       }).then((success) => {
         if (success) {
           setSyncStatus('success');
-          setSyncMessage(`스프레드시트(GAS)에 실시간 기록 완료!`);
+          setSyncMessage(selectedEmotions.length > 0 || customNote ? `스프레드시트(GAS)에 실시간 기록 완료!` : `스프레드시트(GAS)에 감정 해제 기록 완료!`);
           setTimeout(() => setSyncStatus('idle'), 3000);
         }
       });
@@ -460,9 +488,6 @@ export default function App() {
         emotionDescription: description
       }).catch((err) => console.warn('Direct sheet append fallback error:', err));
     }
-
-    // Clear teacher selection after check-in
-    setSelectedTeacherId(null);
   };
 
   // Reset emotion & custom note for single teacher
@@ -470,18 +495,20 @@ export default function App() {
     const targetTeacher = teachers.find(t => t.id === teacherId);
     const updatedTeachers = teachers.map(t => {
       if (t.id === teacherId) {
-        return { ...t, currentEmotionId: undefined, customNote: undefined };
+        return { ...t, currentEmotionId: undefined, emotionIds: [], customNote: undefined };
       }
       return t;
     });
     setTeachers(updatedTeachers);
 
     // Save map
-    const stateMap: Record<string, { emotionId?: string; customNote?: string }> = {};
+    const stateMap: Record<string, { emotionId?: string; emotionIds?: string[]; customNote?: string }> = {};
     updatedTeachers.forEach(t => {
-      if (t.currentEmotionId || t.customNote) {
+      const ids = t.emotionIds && t.emotionIds.length > 0 ? t.emotionIds : (t.currentEmotionId ? [t.currentEmotionId] : []);
+      if (ids.length > 0 || t.customNote) {
         stateMap[t.name] = {
           emotionId: t.currentEmotionId,
+          emotionIds: ids,
           customNote: t.customNote
         };
       }
@@ -490,17 +517,74 @@ export default function App() {
 
     if (targetTeacher) {
       resetTeacherStateInCloud(selectedDate, targetTeacher.name);
+
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+
+      const resetRecord = {
+        date: selectedDate,
+        time: timeString,
+        teacherName: targetTeacher.name,
+        emoji: '❌',
+        emotionTitle: '선택 해제됨',
+        emotionDescription: '선생님의 감정이 초기화(해제)되었습니다.'
+      };
+
+      if (gasUrl) {
+        setSyncStatus('syncing');
+        setSyncMessage(`${targetTeacher.name} 선생님 감정 해제 시트 기록 중...`);
+        sendToGasWebhook(gasUrl, resetRecord).then((success) => {
+          if (success) {
+            setSyncStatus('success');
+            setSyncMessage(`스프레드시트(GAS)에 해제 상태 기록 완료!`);
+            setTimeout(() => setSyncStatus('idle'), 3000);
+          }
+        });
+      }
+
+      if (sheetConfig.spreadsheetId && googleToken) {
+        appendEmotionRecord(googleToken, sheetConfig.spreadsheetId, resetRecord).catch(() => {});
+      }
     }
   };
 
   // Reset all emotions & custom notes today
   const handleResetAll = () => {
-    const updatedTeachers = teachers.map(t => ({ ...t, currentEmotionId: undefined, customNote: undefined }));
+    const updatedTeachers = teachers.map(t => ({ ...t, currentEmotionId: undefined, emotionIds: [], customNote: undefined }));
     setTeachers(updatedTeachers);
     localStorage.removeItem(`emotion_board_state_${selectedDate}`);
     localStorage.removeItem(`emotion_board_logs_${selectedDate}`);
     setRecentLogs([]);
     resetDailyBoardInCloud(selectedDate);
+
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+
+    const resetAllRecord = {
+      date: selectedDate,
+      time: timeString,
+      teacherName: '전체 교사',
+      emoji: '🧹',
+      emotionTitle: '전체 감정 초기화',
+      emotionDescription: '오늘 전광판의 전체 교사 감정이 초기화(해제)되었습니다.'
+    };
+
+    if (gasUrl) {
+      sendToGasWebhook(gasUrl, resetAllRecord);
+    }
+    if (sheetConfig.spreadsheetId && googleToken) {
+      appendEmotionRecord(googleToken, sheetConfig.spreadsheetId, resetAllRecord).catch(() => {});
+    }
   };
 
   const handleShareLink = () => {

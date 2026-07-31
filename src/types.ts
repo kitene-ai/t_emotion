@@ -2,6 +2,7 @@ export interface Teacher {
   id: string;
   name: string;
   currentEmotionId?: string;
+  emotionIds?: string[];
   customNote?: string;
   updatedAt?: string;
 }
