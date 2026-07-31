@@ -20,18 +20,36 @@ export default function TeacherList({
 }: TeacherListProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unchecked' | 'checked'>('all');
+
   // Find emotion helper
   const getTeacherEmotion = (emotionId?: string): Emotion | undefined => {
     if (!emotionId) return undefined;
     return EMOTIONS.find((e) => e.id === emotionId);
   };
 
-  const filteredTeachers = teachers.filter((t) =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTeachers = teachers.filter((t) => {
+    const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const hasEmotion = Boolean(t.currentEmotionId || t.customNote);
+    if (!matchesSearch) return false;
+    if (statusFilter === 'unchecked') return !hasEmotion;
+    if (statusFilter === 'checked') return hasEmotion;
+    return true;
+  });
 
   const checkedCount = teachers.filter((t) => t.currentEmotionId || t.customNote).length;
   const totalCount = teachers.length;
+
+  const handleTeacherClick = (teacherId: string) => {
+    onSelectTeacher(teacherId);
+    // Smooth scroll to emotion board on mobile devices
+    setTimeout(() => {
+      const el = document.getElementById('emotion_board_container');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
 
 
   return (
@@ -60,16 +78,41 @@ export default function TeacherList({
           )}
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-2 gap-2 bg-natural-bg p-2.5 rounded-xl text-xs text-natural-text font-semibold border border-natural-border">
-          <div className="text-center border-r border-natural-border">
-            <span className="text-natural-text/60 mr-1">체크 완료:</span>
-            <span className="text-natural-deep-green font-bold">{checkedCount}명</span>
-          </div>
-          <div className="text-center">
-            <span className="text-natural-text/60 mr-1">미체크:</span>
-            <span className="text-natural-sand font-bold">{totalCount - checkedCount}명</span>
-          </div>
+        {/* Stats & Quick Filter Tabs */}
+        <div className="flex items-center gap-1.5 p-1 bg-natural-bg rounded-xl text-xs font-semibold border border-natural-border">
+          <button
+            id="filter_all_teachers_btn"
+            onClick={() => setStatusFilter('all')}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
+              statusFilter === 'all'
+                ? 'bg-white text-natural-olive font-bold shadow-sm border border-natural-border'
+                : 'text-natural-text/60 hover:text-natural-olive'
+            }`}
+          >
+            전체 ({totalCount})
+          </button>
+          <button
+            id="filter_unchecked_teachers_btn"
+            onClick={() => setStatusFilter('unchecked')}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
+              statusFilter === 'unchecked'
+                ? 'bg-natural-sand text-white font-bold shadow-sm'
+                : 'text-natural-text/60 hover:text-natural-olive'
+            }`}
+          >
+            미체크 ({totalCount - checkedCount})
+          </button>
+          <button
+            id="filter_checked_teachers_btn"
+            onClick={() => setStatusFilter('checked')}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all cursor-pointer ${
+              statusFilter === 'checked'
+                ? 'bg-natural-deep-green text-white font-bold shadow-sm'
+                : 'text-natural-text/60 hover:text-natural-olive'
+            }`}
+          >
+            완료 ({checkedCount})
+          </button>
         </div>
 
         {/* Search input */}
@@ -108,7 +151,7 @@ export default function TeacherList({
                 <div
                   id={`teacher_card_${teacher.id}`}
                   key={teacher.id}
-                  onClick={() => onSelectTeacher(teacher.id)}
+                  onClick={() => handleTeacherClick(teacher.id)}
                   className={`group relative flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
                     isSelected
                       ? 'border-natural-sand bg-natural-soft-bg/50 shadow-md ring-2 ring-natural-sand/20'

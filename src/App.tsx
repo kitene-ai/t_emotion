@@ -529,7 +529,7 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Left panel: Teacher status list (Lg column: 4 of 12) */}
-          <div className="lg:col-span-4 h-full flex flex-col gap-4">
+          <div className="lg:col-span-4 h-full flex flex-col gap-4 order-1">
             <TeacherList
               teachers={teachers}
               selectedTeacherId={selectedTeacherId}
@@ -538,16 +538,23 @@ export default function App() {
               onResetAll={handleResetAll}
             />
             
-            <RecentActivity logs={recentLogs} />
+            <div className="hidden lg:block">
+              <RecentActivity logs={recentLogs} />
+            </div>
           </div>
 
           {/* Right panel: 30 Wit Emotion choices (Lg column: 8 of 12) */}
-          <div className="lg:col-span-8 h-full">
+          <div className="lg:col-span-8 h-full order-2">
             <EmotionBoard
               selectedTeacherId={selectedTeacherId}
               teachers={teachers}
               onSelectEmotion={handleSelectEmotion}
             />
+          </div>
+
+          {/* Recent Activity for Mobile View (order-3) */}
+          <div className="block lg:hidden order-3">
+            <RecentActivity logs={recentLogs} />
           </div>
 
         </div>
