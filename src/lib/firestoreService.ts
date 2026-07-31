@@ -18,6 +18,23 @@ export async function saveRosterToCloud(names: string[]): Promise<boolean> {
   }
 }
 
+// 1-1. Get shared roster once from Firestore
+export async function getSharedRosterFromCloud(): Promise<string[] | null> {
+  try {
+    const docRef = doc(db, ROSTER_DOC_PATH[0], ROSTER_DOC_PATH[1]);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (Array.isArray(data?.names) && data.names.length > 0) {
+        return data.names;
+      }
+    }
+  } catch (error) {
+    console.warn('Firestore getSharedRosterFromCloud error:', error);
+  }
+  return null;
+}
+
 // 2. Subscribe to real-time roster changes
 export function subscribeRosterFromCloud(onUpdate: (names: string[]) => void) {
   try {

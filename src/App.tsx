@@ -12,6 +12,7 @@ import { User } from 'firebase/auth';
 import { AlertCircle, FileSpreadsheet, Sparkles, RefreshCw } from 'lucide-react';
 import {
   saveRosterToCloud,
+  getSharedRosterFromCloud,
   subscribeRosterFromCloud,
   saveDailyStateToCloud,
   subscribeDailyBoardFromCloud,
@@ -63,6 +64,24 @@ export default function App() {
     if (urlRoster && urlRoster.length > 0) {
       localStorage.setItem('emotion_board_teacher_names', JSON.stringify(urlRoster));
       saveRosterToCloud(urlRoster);
+    } else {
+      // Fetch cloud roster immediately so new users/devices see the shared list
+      getSharedRosterFromCloud().then((cloudNames) => {
+        if (cloudNames && cloudNames.length > 0) {
+          localStorage.setItem('emotion_board_teacher_names', JSON.stringify(cloudNames));
+          setTeachers((prevTeachers) => {
+            return cloudNames.map((name, index) => {
+              const existing = prevTeachers.find((t) => t.name === name);
+              return {
+                id: `teacher_${index}_${name}`,
+                name,
+                currentEmotionId: existing?.currentEmotionId,
+                customNote: existing?.customNote
+              };
+            });
+          });
+        }
+      });
     }
 
     // Load sheet configuration
@@ -436,7 +455,6 @@ export default function App() {
         sheetConfig={sheetConfig}
         googleUser={googleUser}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onGoogleLogin={handleQuickReauth}
         onShareLink={handleShareLink}
       />
 

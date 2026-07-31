@@ -8,7 +8,6 @@ interface HeaderProps {
   sheetConfig: SheetConfig;
   googleUser: User | null;
   onOpenSettings: () => void;
-  onGoogleLogin: () => void;
   onShareLink: () => void;
 }
 
@@ -18,7 +17,6 @@ export default function Header({
   sheetConfig,
   googleUser,
   onOpenSettings,
-  onGoogleLogin,
   onShareLink,
 }: HeaderProps) {
   return (
@@ -93,12 +91,13 @@ export default function Header({
           </button>
         )}
 
-        {/* Google User Avatar or Quick Login */}
-        {googleUser ? (
+        {/* Google User Avatar (shown only when logged in) */}
+        {googleUser && (
           <button
             id="header_user_profile_btn"
             onClick={onOpenSettings}
             className="flex items-center gap-2 px-2.5 py-1.5 bg-natural-bg hover:bg-natural-soft-bg border border-natural-border rounded-xl text-xs font-bold text-natural-text shadow-sm transition-colors cursor-pointer"
+            title="연동 계정 정보 (설정 열기)"
           >
             {googleUser.photoURL ? (
               <img
@@ -113,15 +112,6 @@ export default function Header({
               </div>
             )}
             <span className="max-w-[80px] truncate">{googleUser.displayName} 님</span>
-          </button>
-        ) : (
-          <button
-            id="header_quick_login_btn"
-            onClick={onGoogleLogin}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-natural-sand hover:bg-natural-sand/90 text-white text-xs font-bold rounded-xl shadow-md shadow-natural-sand/10 transition-all cursor-pointer"
-          >
-            <LogIn size={14} />
-            구글 로그인
           </button>
         )}
 

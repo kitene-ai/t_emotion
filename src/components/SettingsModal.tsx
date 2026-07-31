@@ -382,9 +382,9 @@ export default function SettingsModal({
                   </div>
                 ) : (
                   <div>
-                    <p className="text-xs text-natural-text/60 mb-3">
-                      구글 시트에 감정을 기록하려면 Google 계정 로그인이 필요합니다.
-                    </p>
+                    <div className="bg-amber-50 border border-amber-200/80 text-amber-900 text-xs p-3 rounded-xl mb-3 leading-relaxed font-medium">
+                      💡 <strong>진행 교사(관리자) 전용:</strong> 일반 참여 선생님은 구글 로그인이 필요 없습니다. 전광판에 감정을 기록할 수 있도록 구글 시트로 백업을 관리할 선생님만 로그인해 주세요.
+                    </div>
                     <button
                       id="google_login_btn"
                       onClick={handleGoogleLogin}
