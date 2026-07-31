@@ -509,6 +509,12 @@ export default function App() {
       localStorage.setItem('emotion_board_teacher_names', JSON.stringify(currentNames));
       saveRosterToCloud(currentNames);
     }
+    const shareUrl = getUrlWithRoster(currentNames);
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setSyncStatus('success');
+      setSyncMessage('📋 교사 명단이 연동된 생성 공유 주소가 클립보드에 복사되었습니다!');
+      setTimeout(() => setSyncStatus('idle'), 4000);
+    }).catch(() => {});
     setIsShareModalOpen(true);
   };
 
