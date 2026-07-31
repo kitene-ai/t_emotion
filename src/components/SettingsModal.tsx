@@ -18,6 +18,7 @@ interface SettingsModalProps {
   onAuthChange: (user: User | null, token: string | null) => void;
   gasUrl: string;
   onSaveGasUrl: (url: string) => void;
+  onResetAll?: () => void;
 }
 
 export default function SettingsModal({
@@ -32,6 +33,7 @@ export default function SettingsModal({
   onAuthChange,
   gasUrl,
   onSaveGasUrl,
+  onResetAll,
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'teachers' | 'sheets'>('teachers');
   
@@ -321,6 +323,33 @@ export default function SettingsModal({
                   명단 공유 링크 복사
                 </button>
               </div>
+
+              {/* Reset Section for Host/Manager */}
+              {onResetAll && (
+                <div className="mt-6 pt-4 border-t border-natural-border/70 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-natural-olive flex items-center gap-1.5">
+                      <span>🧹 오늘의 감정판 전체 초기화 (강사/관리자 전용)</span>
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-natural-text/60 leading-relaxed">
+                    새로운 연수 세션을 시작할 때 모든 연수생들의 감정 체크 상태를 일괄 초기화합니다. (구글 시트 누적 기록은 안전하게 보존됩니다.)
+                  </p>
+                  <button
+                    id="reset_all_emotions_modal_btn"
+                    onClick={() => {
+                      if (window.confirm('모든 교사의 오늘 감정 체크 상태를 초기화하시겠습니까?\n\n(구글 시트에 이미 전송된 기록은 삭제되지 않고 안전하게 유지됩니다.)')) {
+                        onResetAll();
+                        alert('전체 교사의 감정 체크 상태가 초기화되었습니다.');
+                      }
+                    }}
+                    className="w-full py-2.5 bg-amber-100/80 hover:bg-amber-200/80 text-amber-900 border border-amber-300/60 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                  >
+                    <Trash2 size={14} className="text-amber-800" />
+                    모든 참여 교사 감정 체크 전체 초기화
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

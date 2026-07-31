@@ -3,6 +3,7 @@ import Header from './components/Header';
 import TeacherList from './components/TeacherList';
 import EmotionBoard from './components/EmotionBoard';
 import SettingsModal from './components/SettingsModal';
+import ShareModal from './components/ShareModal';
 import RecentActivity from './components/RecentActivity';
 import { Teacher, SheetConfig, LogItem } from './types';
 import { EMOTIONS } from './data/emotions';
@@ -48,8 +49,9 @@ export default function App() {
   const [isAuthRestoring, setIsAuthRestoring] = useState(true);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
 
-  // Settings & GAS State
+  // Settings, Share & GAS State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [gasUrl, setGasUrl] = useState<string>(DEFAULT_GAS_URL);
 
   // Sync Log states
@@ -457,15 +459,7 @@ export default function App() {
   };
 
   const handleShareLink = () => {
-    const currentNames = teachers.map(t => t.name);
-    const shareUrl = getUrlWithRoster(currentNames);
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      setSyncStatus('success');
-      setSyncMessage('📋 교사 명단이 동기화된 전광판 공유 링크가 클립보드에 복사되었습니다!');
-      setTimeout(() => setSyncStatus('idle'), 4000);
-    }).catch(() => {
-      alert(`공유 전용 링크:\n${shareUrl}`);
-    });
+    setIsShareModalOpen(true);
   };
 
   const handleGoHome = () => {
@@ -613,6 +607,14 @@ export default function App() {
         onAuthChange={handleAuthChange}
         gasUrl={gasUrl}
         onSaveGasUrl={handleSaveGasUrl}
+        onResetAll={handleResetAll}
+      />
+
+      {/* Share Modal (Clean URL, TinyURL & QR code) */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        teacherNames={teachers.map(t => t.name)}
       />
     </div>
   );

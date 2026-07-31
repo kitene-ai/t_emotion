@@ -61,21 +61,6 @@ export default function TeacherList({
             <UserCheck size={18} className="text-natural-sage" />
             연수 교사 명단 ({totalCount}명)
           </h3>
-          {totalCount > 0 && (
-            <button
-              id="reset_all_teachers_btn"
-              onClick={() => {
-                if (window.confirm('모든 교사의 오늘 감정 상태를 초기화하시겠습니까? (구글 시트의 기존 기록은 유지됩니다)')) {
-                  onResetAll();
-                }
-              }}
-              className="text-xs text-[#BC6C25] hover:text-natural-sand font-semibold flex items-center gap-1 hover:underline transition-all cursor-pointer"
-              title="모든 교사 감정 초기화"
-            >
-              <Trash2 size={13} />
-              전체 초기화
-            </button>
-          )}
         </div>
 
         {/* Stats & Quick Filter Tabs */}
