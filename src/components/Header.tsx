@@ -1,4 +1,4 @@
-import { Settings, Calendar, FileSpreadsheet, LogIn, Link2Off } from 'lucide-react';
+import { Settings, Calendar, FileSpreadsheet, LogIn, Link2Off, Share2 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { SheetConfig } from '../types';
 
@@ -9,6 +9,7 @@ interface HeaderProps {
   googleUser: User | null;
   onOpenSettings: () => void;
   onGoogleLogin: () => void;
+  onShareLink: () => void;
 }
 
 export default function Header({
@@ -18,6 +19,7 @@ export default function Header({
   googleUser,
   onOpenSettings,
   onGoogleLogin,
+  onShareLink,
 }: HeaderProps) {
   return (
     <header className="w-full bg-white border-b border-natural-border py-4 px-6 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
@@ -51,6 +53,17 @@ export default function Header({
             className="bg-transparent border-none focus:outline-none font-sans text-natural-text font-bold cursor-pointer"
           />
         </div>
+
+        {/* Share Button */}
+        <button
+          id="header_share_roster_btn"
+          onClick={onShareLink}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-natural-light-sage/60 hover:bg-natural-light-sage border border-natural-sage/30 text-natural-deep-green text-xs font-bold rounded-xl shadow-sm hover:scale-105 transition-all cursor-pointer"
+          title="교사 명단이 포함된 전광판 공유 링크 복사"
+        >
+          <Share2 size={14} />
+          <span className="hidden sm:inline">전광판 공유</span>
+        </button>
 
         {/* Google Sheet Sync Status Badge */}
         {sheetConfig.spreadsheetId ? (

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, FileSpreadsheet, Plus, Trash2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, Save, FileSpreadsheet, Plus, Trash2, ExternalLink, RefreshCw, AlertCircle, Share2 } from 'lucide-react';
 import { extractSpreadsheetId, createNewSpreadsheet, validateSpreadsheetAccess } from '../lib/sheets';
 import { googleSignIn, googleSignOut } from '../lib/firebase';
 import { User } from 'firebase/auth';
 import { SheetConfig } from '../types';
+import { getUrlWithRoster } from '../lib/firestoreService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -71,8 +72,22 @@ export default function SettingsModal({
     setTeachersCount(parsedNames.length);
     setNamesText(parsedNames.join('\n'));
     
-    // Show a temporary success style or close
-    alert('교사 명단이 성공적으로 저장되었습니다! (최대 150명)');
+    alert('교사 명단이 클라우드 동기화 DB에 성공적으로 저장되었습니다!\n다른 분이 이 앱 링크를 열어도 동일한 교사 명단이 자동으로 나타납니다.');
+  };
+
+  const handleShareRosterLink = () => {
+    const rawLines = namesText.split('\n');
+    const parsedNames = rawLines
+      .map(name => name.trim())
+      .filter(name => name.length > 0)
+      .slice(0, 150);
+
+    const shareUrl = getUrlWithRoster(parsedNames.length > 0 ? parsedNames : teacherNames);
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      alert('📋 명단이 포함된 전광판 링크가 클립보드에 복사되었습니다!\n이 링크를 전달하면 누구나 동일한 명단으로 참여할 수 있습니다.');
+    }).catch(() => {
+      alert(`공유 링크: ${shareUrl}`);
+    });
   };
 
   // Preset template names
@@ -281,14 +296,25 @@ export default function SettingsModal({
                 </div>
               )}
 
-              <button
-                id="save_teachers_btn"
-                onClick={handleSaveTeachers}
-                className="w-full py-3 bg-natural-sand hover:bg-natural-sand/95 active:bg-natural-sand text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-md shadow-natural-sand/10 transition-all cursor-pointer"
-              >
-                <Save size={18} />
-                명단 저장 및 적용하기
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                <button
+                  id="save_teachers_btn"
+                  onClick={handleSaveTeachers}
+                  className="flex-1 py-3 bg-natural-sand hover:bg-natural-sand/95 active:bg-natural-sand text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-md shadow-natural-sand/10 transition-all cursor-pointer text-sm"
+                >
+                  <Save size={18} />
+                  클라우드 저장 및 적용
+                </button>
+                <button
+                  id="share_roster_link_btn"
+                  onClick={handleShareRosterLink}
+                  className="py-3 px-4 bg-natural-light-sage/70 hover:bg-natural-light-sage border border-natural-sage/30 text-natural-deep-green font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer text-sm shrink-0"
+                  title="교사 명단이 포함된 전광판 전용 URL 복사"
+                >
+                  <Share2 size={18} />
+                  명단 공유 링크 복사
+                </button>
+              </div>
             </div>
           )}
 

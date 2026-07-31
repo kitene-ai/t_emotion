@@ -10,6 +10,16 @@ import { initAuth, googleSignIn } from './lib/firebase';
 import { appendEmotionRecord } from './lib/sheets';
 import { User } from 'firebase/auth';
 import { AlertCircle, FileSpreadsheet, Sparkles, RefreshCw } from 'lucide-react';
+import {
+  saveRosterToCloud,
+  subscribeRosterFromCloud,
+  saveDailyStateToCloud,
+  subscribeDailyBoardFromCloud,
+  resetTeacherStateInCloud,
+  resetDailyBoardInCloud,
+  getUrlWithRoster,
+  parseRosterFromUrl
+} from './lib/firestoreService';
 
 const DEFAULT_TEACHERS = [
   '김연수', '박배움', '이열정', '최미소', '정행복', 
@@ -48,6 +58,13 @@ export default function App() {
     const formattedToday = today.toISOString().split('T')[0];
     setSelectedDate(formattedToday);
 
+    // Check URL parameters for shared roster
+    const urlRoster = parseRosterFromUrl();
+    if (urlRoster && urlRoster.length > 0) {
+      localStorage.setItem('emotion_board_teacher_names', JSON.stringify(urlRoster));
+      saveRosterToCloud(urlRoster);
+    }
+
     // Load sheet configuration
     const storedSheet = localStorage.getItem('emotion_board_sheet_config');
     if (storedSheet) {
@@ -70,17 +87,37 @@ export default function App() {
         setGoogleUser(null);
         setGoogleToken(null);
         setIsAuthRestoring(false);
-        // If there is a spreadsheet linked, but no token, we mark the session as needing re-auth
         if (localStorage.getItem('emotion_board_sheet_config')) {
           setIsSessionExpired(true);
         }
       }
     );
 
-    return () => unsubscribe();
+    // Subscribe to cloud master roster changes in real-time
+    const unsubscribeRoster = subscribeRosterFromCloud((cloudNames) => {
+      if (cloudNames && cloudNames.length > 0) {
+        localStorage.setItem('emotion_board_teacher_names', JSON.stringify(cloudNames));
+        setTeachers((prevTeachers) => {
+          return cloudNames.map((name, index) => {
+            const existing = prevTeachers.find((t) => t.name === name);
+            return {
+              id: `teacher_${index}_${name}`,
+              name,
+              currentEmotionId: existing?.currentEmotionId,
+              customNote: existing?.customNote
+            };
+          });
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      if (typeof unsubscribeRoster === 'function') unsubscribeRoster();
+    };
   }, []);
 
-  // 2. Load teachers and logs when Date changes
+  // 2. Load teachers and subscribe to daily board changes when Date changes
   useEffect(() => {
     if (!selectedDate) return;
 
@@ -136,15 +173,36 @@ export default function App() {
     } else {
       setRecentLogs([]);
     }
+
+    // Subscribe to real-time daily board updates from Firestore cloud
+    const unsubscribeDaily = subscribeDailyBoardFromCloud(selectedDate, (cloudStateMap) => {
+      setTeachers((prevTeachers) => {
+        return prevTeachers.map((t) => {
+          const cloudItem = cloudStateMap[t.name];
+          if (cloudItem) {
+            return {
+              ...t,
+              currentEmotionId: cloudItem.emotionId !== undefined ? cloudItem.emotionId : t.currentEmotionId,
+              customNote: cloudItem.customNote !== undefined ? cloudItem.customNote : t.customNote
+            };
+          }
+          return t;
+        });
+      });
+    });
+
+    return () => {
+      if (typeof unsubscribeDaily === 'function') unsubscribeDaily();
+    };
   }, [selectedDate]);
 
-  // 3. Save Teachers or Sheet settings to localStorage
+  // 3. Save Teachers or Sheet settings to localStorage & Cloud
   const handleSaveTeachers = (newNames: string[]) => {
     localStorage.setItem('emotion_board_teacher_names', JSON.stringify(newNames));
+    saveRosterToCloud(newNames); // Sync to Firestore!
     
     // Merge new names with current emotions on screen
     const updatedTeachers: Teacher[] = newNames.map((name, index) => {
-      // Find if we already had an emotion/note for this teacher
       const existing = teachers.find(t => t.name === name);
       return {
         id: `teacher_${index}_${name}`,
@@ -224,7 +282,7 @@ export default function App() {
     });
     setTeachers(updatedTeachers);
 
-    // B. Save today's map to localStorage
+    // B. Save today's map to localStorage & Firestore Cloud
     const stateMap: Record<string, { emotionId?: string; customNote?: string }> = {};
     updatedTeachers.forEach(t => {
       if (t.currentEmotionId || t.customNote) {
@@ -235,6 +293,12 @@ export default function App() {
       }
     });
     localStorage.setItem(`emotion_board_state_${selectedDate}`, JSON.stringify(stateMap));
+
+    // Save to Firestore cloud database in real-time
+    saveDailyStateToCloud(selectedDate, teacher.name, {
+      emotionId,
+      customNote
+    });
 
     // C. Add to live activity feed
     const now = new Date();
@@ -304,6 +368,7 @@ export default function App() {
 
   // Reset emotion & custom note for single teacher
   const handleResetEmotion = (teacherId: string) => {
+    const targetTeacher = teachers.find(t => t.id === teacherId);
     const updatedTeachers = teachers.map(t => {
       if (t.id === teacherId) {
         return { ...t, currentEmotionId: undefined, customNote: undefined };
@@ -323,6 +388,10 @@ export default function App() {
       }
     });
     localStorage.setItem(`emotion_board_state_${selectedDate}`, JSON.stringify(stateMap));
+
+    if (targetTeacher) {
+      resetTeacherStateInCloud(selectedDate, targetTeacher.name);
+    }
   };
 
   // Reset all emotions & custom notes today
@@ -332,6 +401,19 @@ export default function App() {
     localStorage.removeItem(`emotion_board_state_${selectedDate}`);
     localStorage.removeItem(`emotion_board_logs_${selectedDate}`);
     setRecentLogs([]);
+    resetDailyBoardInCloud(selectedDate);
+  };
+
+  const handleShareLink = () => {
+    const currentNames = teachers.map(t => t.name);
+    const shareUrl = getUrlWithRoster(currentNames);
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setSyncStatus('success');
+      setSyncMessage('📋 교사 명단이 동기화된 전광판 공유 링크가 클립보드에 복사되었습니다!');
+      setTimeout(() => setSyncStatus('idle'), 4000);
+    }).catch(() => {
+      alert(`공유 전용 링크:\n${shareUrl}`);
+    });
   };
 
   const getFormattedDateWithDay = (dateStr: string) => {
@@ -355,6 +437,7 @@ export default function App() {
         googleUser={googleUser}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onGoogleLogin={handleQuickReauth}
+        onShareLink={handleShareLink}
       />
 
       {/* Main Board Section */}
