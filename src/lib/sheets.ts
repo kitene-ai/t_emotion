@@ -192,3 +192,37 @@ export async function validateSpreadsheetAccess(accessToken: string, spreadsheet
     return false;
   }
 }
+
+/**
+ * Sends emotion record to Google Apps Script (GAS) Web App endpoint without needing OAuth token
+ */
+export async function sendToGasWebhook(
+  gasUrl: string,
+  record: {
+    date: string;
+    time: string;
+    teacherName: string;
+    emoji: string;
+    emotionTitle: string;
+    emotionDescription: string;
+  }
+): Promise<boolean> {
+  const cleanUrl = gasUrl ? gasUrl.trim() : '';
+  if (!cleanUrl || !cleanUrl.startsWith('http')) return false;
+
+  try {
+    const payload = JSON.stringify(record);
+    await fetch(cleanUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: payload,
+      mode: 'no-cors',
+    });
+    return true;
+  } catch (error) {
+    console.warn('GAS webhook send error:', error);
+    return false;
+  }
+}

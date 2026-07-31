@@ -16,6 +16,8 @@ interface SettingsModalProps {
   googleUser: User | null;
   googleToken: string | null;
   onAuthChange: (user: User | null, token: string | null) => void;
+  gasUrl: string;
+  onSaveGasUrl: (url: string) => void;
 }
 
 export default function SettingsModal({
@@ -28,6 +30,8 @@ export default function SettingsModal({
   googleUser,
   googleToken,
   onAuthChange,
+  gasUrl,
+  onSaveGasUrl,
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'teachers' | 'sheets'>('teachers');
   
@@ -35,8 +39,9 @@ export default function SettingsModal({
   const [namesText, setNamesText] = useState('');
   const [teachersCount, setTeachersCount] = useState(0);
 
-  // Sheet configuration state
+  // Sheet & GAS configuration state
   const [sheetUrlInput, setSheetUrlInput] = useState('');
+  const [gasUrlInput, setGasUrlInput] = useState('');
   const [isCreatingSheet, setIsCreatingSheet] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [sheetError, setSheetError] = useState<string | null>(null);
@@ -46,7 +51,8 @@ export default function SettingsModal({
     // Populate textarea with current names separated by newline
     setNamesText(teacherNames.join('\n'));
     setTeachersCount(teacherNames.length);
-  }, [teacherNames, isOpen]);
+    setGasUrlInput(gasUrl || '');
+  }, [teacherNames, gasUrl, isOpen]);
 
   useEffect(() => {
     if (sheetConfig.spreadsheetUrl) {
@@ -328,6 +334,45 @@ export default function SettingsModal({
               <p className="text-xs text-natural-text/60 leading-relaxed">
                 연수 날짜별로 참여하는 교사들의 실시간 감정 상태(이모티콘, 감정명, 날짜, 시간)를 구글 스프레드시트에 자동으로 누적하여 기록(누가기록)해 나갈 수 있습니다.
               </p>
+
+              {/* ⚡ GAS Web App Auto-Sync Section (No login required for participants) */}
+              <div className="p-4 rounded-xl border border-natural-sand/40 bg-amber-50/60 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-natural-olive flex items-center gap-1.5">
+                    <span>⚡ Google Apps Script (GAS) 웹앱 연동</span>
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    스마트폰 참여자 무로그인 자동 기록
+                  </span>
+                </div>
+
+                <p className="text-xs text-natural-text/80 leading-relaxed">
+                  스마트폰으로 접속한 일반 참여 선생님들이 <strong>구글 로그인을 하지 않아도</strong> 터치 즉시 구글 시트로 자동 전송되도록 설정된 앱스크립트 배포 주소입니다.
+                </p>
+
+                <div className="space-y-2">
+                  <input
+                    id="gas_url_input"
+                    type="text"
+                    value={gasUrlInput}
+                    onChange={(e) => setGasUrlInput(e.target.value)}
+                    placeholder="https://script.google.com/macros/s/.../exec"
+                    className="w-full px-3 py-2 border border-natural-border rounded-xl focus:outline-none focus:ring-2 focus:ring-natural-sand text-xs bg-white font-mono text-[11px]"
+                  />
+                  <button
+                    id="save_gas_url_btn"
+                    onClick={() => {
+                      onSaveGasUrl(gasUrlInput);
+                      setSheetSuccess('구글 앱스크립트(GAS) 웹앱 주소가 저장되고 전 단말기에 공유되었습니다!');
+                      setTimeout(() => setSheetSuccess(null), 3500);
+                    }}
+                    className="w-full py-2 bg-natural-sand hover:bg-natural-sand/90 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  >
+                    <Save size={14} />
+                    앱스크립트 웹앱 주소 저장 및 전체 클라우드 공유
+                  </button>
+                </div>
+              </div>
 
               {/* 1. Auth Status */}
               <div className="p-4 rounded-xl border border-natural-border bg-natural-bg space-y-3">

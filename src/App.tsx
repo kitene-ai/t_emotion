@@ -7,7 +7,7 @@ import RecentActivity from './components/RecentActivity';
 import { Teacher, SheetConfig, LogItem } from './types';
 import { EMOTIONS } from './data/emotions';
 import { initAuth, googleSignIn } from './lib/firebase';
-import { appendEmotionRecord } from './lib/sheets';
+import { appendEmotionRecord, sendToGasWebhook } from './lib/sheets';
 import { User } from 'firebase/auth';
 import { AlertCircle, FileSpreadsheet, Sparkles, RefreshCw } from 'lucide-react';
 import {
@@ -19,7 +19,11 @@ import {
   resetTeacherStateInCloud,
   resetDailyBoardInCloud,
   getUrlWithRoster,
-  parseRosterFromUrl
+  parseRosterFromUrl,
+  DEFAULT_GAS_URL,
+  saveGasUrlToCloud,
+  getGasUrlFromCloud,
+  subscribeGasUrlFromCloud
 } from './lib/firestoreService';
 
 const DEFAULT_TEACHERS = [
@@ -44,20 +48,40 @@ export default function App() {
   const [isAuthRestoring, setIsAuthRestoring] = useState(true);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
 
-  // Settings State
+  // Settings & GAS State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [gasUrl, setGasUrl] = useState<string>(DEFAULT_GAS_URL);
 
   // Sync Log states
   const [recentLogs, setRecentLogs] = useState<LogItem[]>([]);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [syncMessage, setSyncMessage] = useState<string>('');
 
-  // 1. Initialize Date & Load local configurations
+  // 1. Initialize Date & Load local/cloud configurations
   useEffect(() => {
     // Default to today's date in YYYY-MM-DD
     const today = new Date();
     const formattedToday = today.toISOString().split('T')[0];
     setSelectedDate(formattedToday);
+
+    // Load GAS Web App URL from local or cloud
+    const storedGasUrl = localStorage.getItem('emotion_board_gas_url');
+    if (storedGasUrl) {
+      setGasUrl(storedGasUrl);
+    }
+    getGasUrlFromCloud().then((cloudUrl) => {
+      if (cloudUrl) {
+        setGasUrl(cloudUrl);
+        localStorage.setItem('emotion_board_gas_url', cloudUrl);
+      }
+    });
+
+    const unsubscribeGas = subscribeGasUrlFromCloud((cloudUrl) => {
+      if (cloudUrl) {
+        setGasUrl(cloudUrl);
+        localStorage.setItem('emotion_board_gas_url', cloudUrl);
+      }
+    });
 
     // Check URL parameters for shared roster
     const urlRoster = parseRosterFromUrl();
@@ -133,6 +157,7 @@ export default function App() {
     return () => {
       unsubscribe();
       if (typeof unsubscribeRoster === 'function') unsubscribeRoster();
+      if (typeof unsubscribeGas === 'function') unsubscribeGas();
     };
   }, []);
 
@@ -252,6 +277,13 @@ export default function App() {
     setIsSessionExpired(false);
   };
 
+  const handleSaveGasUrl = (url: string) => {
+    const clean = url.trim();
+    setGasUrl(clean);
+    localStorage.setItem('emotion_board_gas_url', clean);
+    saveGasUrlToCloud(clean);
+  };
+
   const handleAuthChange = (user: User | null, token: string | null) => {
     setGoogleUser(user);
     setGoogleToken(token);
@@ -344,41 +376,42 @@ export default function App() {
     setRecentLogs(updatedLogs);
     localStorage.setItem(`emotion_board_logs_${selectedDate}`, JSON.stringify(updatedLogs));
 
-    // D. Sync to Google Sheets if connected!
-    if (sheetConfig.spreadsheetId) {
-      if (!googleToken) {
-        setIsSessionExpired(true);
-        setSyncStatus('error');
-        setSyncMessage('구글 세션이 해제되었습니다. 다시 로그인하여 안전하게 누가기록 하세요.');
-        return;
-      }
+    let description = emotion ? emotion.description : '';
+    if (customNote) {
+      description = description ? `${description} (주관식: ${customNote})` : `주관식: ${customNote}`;
+    }
 
+    // D. Sync to Google Sheets via GAS Web App (works for ALL participants on mobile/web without login!)
+    if (gasUrl) {
       setSyncStatus('syncing');
-      setSyncMessage(`${teacher.name} 샘 감정/상태 구글 시트에 기록 중...`);
+      setSyncMessage(`${teacher.name} 선생님 감정 구글 시트(GAS) 기록 중...`);
 
-      let description = emotion ? emotion.description : '';
-      if (customNote) {
-        description = description ? `${description} (주관식: ${customNote})` : `주관식: ${customNote}`;
-      }
+      sendToGasWebhook(gasUrl, {
+        date: selectedDate,
+        time: timeString,
+        teacherName: teacher.name,
+        emoji,
+        emotionTitle,
+        emotionDescription: description
+      }).then((success) => {
+        if (success) {
+          setSyncStatus('success');
+          setSyncMessage(`스프레드시트(GAS)에 실시간 기록 완료!`);
+          setTimeout(() => setSyncStatus('idle'), 3000);
+        }
+      });
+    }
 
-      try {
-        await appendEmotionRecord(googleToken, sheetConfig.spreadsheetId, {
-          date: selectedDate,
-          time: timeString,
-          teacherName: teacher.name,
-          emoji,
-          emotionTitle,
-          emotionDescription: description
-        });
-
-        setSyncStatus('success');
-        setSyncMessage(`스프레드시트에 실시간 완료! (기록 셀 범위 확보됨)`);
-        setTimeout(() => setSyncStatus('idle'), 3000);
-      } catch (err: any) {
-        console.error(err);
-        setSyncStatus('error');
-        setSyncMessage(`구글 시트 저장 실패: ${err.message || '네트워크 오류'}`);
-      }
+    // E. Direct Google Sheets API append if logged in & spreadsheetId configured
+    if (sheetConfig.spreadsheetId && googleToken) {
+      appendEmotionRecord(googleToken, sheetConfig.spreadsheetId, {
+        date: selectedDate,
+        time: timeString,
+        teacherName: teacher.name,
+        emoji,
+        emotionTitle,
+        emotionDescription: description
+      }).catch((err) => console.warn('Direct sheet append fallback error:', err));
     }
 
     // Clear teacher selection after check-in
@@ -572,6 +605,8 @@ export default function App() {
         googleUser={googleUser}
         googleToken={googleToken}
         onAuthChange={handleAuthChange}
+        gasUrl={gasUrl}
+        onSaveGasUrl={handleSaveGasUrl}
       />
     </div>
   );

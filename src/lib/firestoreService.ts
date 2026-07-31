@@ -2,6 +2,47 @@ import { doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField } from 'firebas
 import { db } from './firebase';
 
 const ROSTER_DOC_PATH = ['settings', 'shared_roster'] as const;
+const GAS_DOC_PATH = ['settings', 'gas_config'] as const;
+
+export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzZVIBp0K1i29pIPaCBe7-ZEEYk42l6GGGdONVxs0CFKU7dmqnKQHMEgoxqVUJaqAZD/exec';
+
+// 0. Save and sync GAS URL
+export async function saveGasUrlToCloud(url: string): Promise<boolean> {
+  try {
+    const docRef = doc(db, GAS_DOC_PATH[0], GAS_DOC_PATH[1]);
+    await setDoc(docRef, { url, updatedAt: new Date().toISOString() });
+    return true;
+  } catch (error) {
+    console.warn('Firestore saveGasUrlToCloud error:', error);
+    return false;
+  }
+}
+
+export async function getGasUrlFromCloud(): Promise<string> {
+  try {
+    const docRef = doc(db, GAS_DOC_PATH[0], GAS_DOC_PATH[1]);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists() && docSnap.data()?.url) {
+      return docSnap.data().url;
+    }
+  } catch (e) {
+    console.warn('getGasUrlFromCloud error:', e);
+  }
+  return DEFAULT_GAS_URL;
+}
+
+export function subscribeGasUrlFromCloud(onUpdate: (url: string) => void) {
+  try {
+    const docRef = doc(db, GAS_DOC_PATH[0], GAS_DOC_PATH[1]);
+    return onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists() && docSnap.data()?.url) {
+        onUpdate(docSnap.data().url);
+      }
+    });
+  } catch (e) {
+    return () => {};
+  }
+}
 
 // 1. Save roster to Firestore
 export async function saveRosterToCloud(names: string[]): Promise<boolean> {
