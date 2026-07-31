@@ -6,6 +6,7 @@ interface ActivityLog {
   teacherName: string;
   emoji: string;
   emotionTitle: string;
+  customNote?: string;
   time: string;
 }
 
@@ -18,7 +19,7 @@ export default function RecentActivity({ logs }: RecentActivityProps) {
     <div className="bg-white border border-natural-border rounded-2xl p-5 shadow-sm">
       <h3 className="text-sm font-bold text-natural-olive flex items-center gap-2 mb-3 pb-2 border-b border-natural-border">
         <Clock size={16} className="text-natural-sage" />
-        실시간 감정 등록 피드 (최근 기록)
+        실시간 감정 & 주관식 한마디 등록 피드
       </h3>
       
       {logs.length === 0 ? (
@@ -38,12 +39,19 @@ export default function RecentActivity({ logs }: RecentActivityProps) {
                   {log.emoji}
                 </span>
                 <div className="min-w-0">
-                  <span className="text-xs font-bold text-natural-text mr-1.5">
-                    {log.teacherName} 선생님
-                  </span>
-                  <span className="text-[10px] text-natural-text/70 font-medium">
-                    "{log.emotionTitle}"
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-natural-text">
+                      {log.teacherName} 선생님
+                    </span>
+                    <span className="text-[10px] text-natural-text/70 font-medium">
+                      "{log.emotionTitle}"
+                    </span>
+                  </div>
+                  {log.customNote && (
+                    <div className="text-[11px] text-natural-deep-green italic font-medium mt-0.5 truncate">
+                      ✍️ "{log.customNote}"
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="text-[10px] text-natural-text/50 font-mono shrink-0 ml-2 flex items-center gap-1">

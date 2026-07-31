@@ -2,6 +2,7 @@ export interface Teacher {
   id: string;
   name: string;
   currentEmotionId?: string;
+  customNote?: string;
   updatedAt?: string;
 }
 
@@ -17,4 +18,13 @@ export interface SheetConfig {
   spreadsheetId: string | null;
   spreadsheetUrl: string | null;
   sheetName: string;
+}
+
+export interface LogItem {
+  id: string;
+  teacherName: string;
+  emoji: string;
+  emotionTitle: string;
+  customNote?: string;
+  time: string;
 }

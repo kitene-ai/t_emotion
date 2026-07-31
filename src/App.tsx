@@ -4,7 +4,7 @@ import TeacherList from './components/TeacherList';
 import EmotionBoard from './components/EmotionBoard';
 import SettingsModal from './components/SettingsModal';
 import RecentActivity from './components/RecentActivity';
-import { Teacher, SheetConfig } from './types';
+import { Teacher, SheetConfig, LogItem } from './types';
 import { EMOTIONS } from './data/emotions';
 import { initAuth, googleSignIn } from './lib/firebase';
 import { appendEmotionRecord } from './lib/sheets';
@@ -16,14 +16,6 @@ const DEFAULT_TEACHERS = [
   '강성장', '윤지혜', '임소통', '한나눔', '송보람',
   '신창의', '유수업', '오나눔'
 ];
-
-interface LogItem {
-  id: string;
-  teacherName: string;
-  emoji: string;
-  emotionTitle: string;
-  time: string;
-}
 
 export default function App() {
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -98,21 +90,37 @@ export default function App() {
 
     // Load current emotions check-ins for this specific date
     const storedState = localStorage.getItem(`emotion_board_state_${selectedDate}`);
-    let emotionMap: Record<string, string> = {};
+    let stateMap: Record<string, any> = {};
     if (storedState) {
       try {
-        emotionMap = JSON.parse(storedState);
+        stateMap = JSON.parse(storedState);
       } catch (e) {
         console.error(e);
       }
     }
 
     // Combine names and loaded emotions into Teacher objects
-    const loadedTeachers: Teacher[] = activeNames.map((name: string, index: number) => ({
-      id: `teacher_${index}_${name}`,
-      name,
-      currentEmotionId: emotionMap[name] || undefined
-    }));
+    const loadedTeachers: Teacher[] = activeNames.map((name: string, index: number) => {
+      const item = stateMap[name];
+      if (typeof item === 'string') {
+        return {
+          id: `teacher_${index}_${name}`,
+          name,
+          currentEmotionId: item
+        };
+      } else if (item && typeof item === 'object') {
+        return {
+          id: `teacher_${index}_${name}`,
+          name,
+          currentEmotionId: item.emotionId,
+          customNote: item.customNote
+        };
+      }
+      return {
+        id: `teacher_${index}_${name}`,
+        name
+      };
+    });
 
     setTeachers(loadedTeachers);
     setSelectedTeacherId(null);
@@ -136,25 +144,29 @@ export default function App() {
     
     // Merge new names with current emotions on screen
     const updatedTeachers: Teacher[] = newNames.map((name, index) => {
-      // Find if we already had an emotion for this teacher
+      // Find if we already had an emotion/note for this teacher
       const existing = teachers.find(t => t.name === name);
       return {
         id: `teacher_${index}_${name}`,
         name,
-        currentEmotionId: existing?.currentEmotionId
+        currentEmotionId: existing?.currentEmotionId,
+        customNote: existing?.customNote
       };
     });
 
     setTeachers(updatedTeachers);
     
     // Update active check state
-    const emotionMap: Record<string, string> = {};
+    const stateMap: Record<string, { emotionId?: string; customNote?: string }> = {};
     updatedTeachers.forEach(t => {
-      if (t.currentEmotionId) {
-        emotionMap[t.name] = t.currentEmotionId;
+      if (t.currentEmotionId || t.customNote) {
+        stateMap[t.name] = {
+          emotionId: t.currentEmotionId,
+          customNote: t.customNote
+        };
       }
     });
-    localStorage.setItem(`emotion_board_state_${selectedDate}`, JSON.stringify(emotionMap));
+    localStorage.setItem(`emotion_board_state_${selectedDate}`, JSON.stringify(stateMap));
   };
 
   const handleSaveSheetConfig = (newConfig: SheetConfig) => {
@@ -190,33 +202,39 @@ export default function App() {
     }
   };
 
-  // 4. Update Emotion Event Handler
-  const handleSelectEmotion = async (emotionId: string) => {
+  // 4. Update Emotion / Custom Note Event Handler
+  const handleSelectEmotion = async (emotionId?: string, customNote?: string) => {
     if (!selectedTeacherId) return;
 
     const teacher = teachers.find(t => t.id === selectedTeacherId);
     if (!teacher) return;
 
-    const emotion = EMOTIONS.find(e => e.id === emotionId);
-    if (!emotion) return;
+    const emotion = emotionId ? EMOTIONS.find(e => e.id === emotionId) : undefined;
 
     // A. Update local teachers state
     const updatedTeachers = teachers.map(t => {
       if (t.id === selectedTeacherId) {
-        return { ...t, currentEmotionId: emotionId };
+        return {
+          ...t,
+          currentEmotionId: emotionId !== undefined ? emotionId : t.currentEmotionId,
+          customNote: customNote !== undefined ? customNote : t.customNote
+        };
       }
       return t;
     });
     setTeachers(updatedTeachers);
 
     // B. Save today's map to localStorage
-    const emotionMap: Record<string, string> = {};
+    const stateMap: Record<string, { emotionId?: string; customNote?: string }> = {};
     updatedTeachers.forEach(t => {
-      if (t.currentEmotionId) {
-        emotionMap[t.name] = t.currentEmotionId;
+      if (t.currentEmotionId || t.customNote) {
+        stateMap[t.name] = {
+          emotionId: t.currentEmotionId,
+          customNote: t.customNote
+        };
       }
     });
-    localStorage.setItem(`emotion_board_state_${selectedDate}`, JSON.stringify(emotionMap));
+    localStorage.setItem(`emotion_board_state_${selectedDate}`, JSON.stringify(stateMap));
 
     // C. Add to live activity feed
     const now = new Date();
@@ -227,11 +245,15 @@ export default function App() {
       hour12: false
     });
 
+    const emoji = emotion ? emotion.emoji : '✍️';
+    const emotionTitle = emotion ? emotion.title : '주관식 한마디 기록';
+
     const newLogItem: LogItem = {
       id: `log_${Date.now()}_${teacher.name}`,
       teacherName: teacher.name,
-      emoji: emotion.emoji,
-      emotionTitle: emotion.title,
+      emoji,
+      emotionTitle,
+      customNote: customNote || undefined,
       time: timeString
     };
 
@@ -249,16 +271,21 @@ export default function App() {
       }
 
       setSyncStatus('syncing');
-      setSyncMessage(`${teacher.name} 샘 감정 구글 시트에 기록 중...`);
+      setSyncMessage(`${teacher.name} 샘 감정/상태 구글 시트에 기록 중...`);
+
+      let description = emotion ? emotion.description : '';
+      if (customNote) {
+        description = description ? `${description} (주관식: ${customNote})` : `주관식: ${customNote}`;
+      }
 
       try {
         await appendEmotionRecord(googleToken, sheetConfig.spreadsheetId, {
           date: selectedDate,
           time: timeString,
           teacherName: teacher.name,
-          emoji: emotion.emoji,
-          emotionTitle: emotion.title,
-          emotionDescription: emotion.description
+          emoji,
+          emotionTitle,
+          emotionDescription: description
         });
 
         setSyncStatus('success');
@@ -271,33 +298,36 @@ export default function App() {
       }
     }
 
-    // Keep the teacher selected or clear it? Clears it for easy next check-in
+    // Clear teacher selection after check-in
     setSelectedTeacherId(null);
   };
 
-  // Reset emotion for single teacher
+  // Reset emotion & custom note for single teacher
   const handleResetEmotion = (teacherId: string) => {
     const updatedTeachers = teachers.map(t => {
       if (t.id === teacherId) {
-        return { ...t, currentEmotionId: undefined };
+        return { ...t, currentEmotionId: undefined, customNote: undefined };
       }
       return t;
     });
     setTeachers(updatedTeachers);
 
     // Save map
-    const emotionMap: Record<string, string> = {};
+    const stateMap: Record<string, { emotionId?: string; customNote?: string }> = {};
     updatedTeachers.forEach(t => {
-      if (t.currentEmotionId) {
-        emotionMap[t.name] = t.currentEmotionId;
+      if (t.currentEmotionId || t.customNote) {
+        stateMap[t.name] = {
+          emotionId: t.currentEmotionId,
+          customNote: t.customNote
+        };
       }
     });
-    localStorage.setItem(`emotion_board_state_${selectedDate}`, JSON.stringify(emotionMap));
+    localStorage.setItem(`emotion_board_state_${selectedDate}`, JSON.stringify(stateMap));
   };
 
-  // Reset all emotions today
+  // Reset all emotions & custom notes today
   const handleResetAll = () => {
-    const updatedTeachers = teachers.map(t => ({ ...t, currentEmotionId: undefined }));
+    const updatedTeachers = teachers.map(t => ({ ...t, currentEmotionId: undefined, customNote: undefined }));
     setTeachers(updatedTeachers);
     localStorage.removeItem(`emotion_board_state_${selectedDate}`);
     localStorage.removeItem(`emotion_board_logs_${selectedDate}`);

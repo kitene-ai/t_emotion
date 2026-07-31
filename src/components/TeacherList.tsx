@@ -30,8 +30,9 @@ export default function TeacherList({
     t.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const checkedCount = teachers.filter((t) => t.currentEmotionId).length;
+  const checkedCount = teachers.filter((t) => t.currentEmotionId || t.customNote).length;
   const totalCount = teachers.length;
+
 
   return (
     <div className="bg-white border border-natural-border rounded-2xl p-5 shadow-sm flex flex-col h-full min-h-[500px]">
@@ -140,11 +141,21 @@ export default function TeacherList({
                         )}
                       </div>
                       
-                      {/* Emotion description */}
-                      {emotion ? (
-                        <div className="flex items-center gap-1 mt-0.5 text-xs text-natural-deep-green font-semibold truncate">
-                          <span className="text-sm shrink-0">{emotion.emoji}</span>
-                          <span className="truncate">{emotion.title}</span>
+                      {/* Emotion & Custom Note description */}
+                      {emotion || teacher.customNote ? (
+                        <div className="flex flex-col gap-0.5 mt-0.5">
+                          {emotion && (
+                            <div className="flex items-center gap-1 text-xs text-natural-deep-green font-semibold truncate">
+                              <span className="text-sm shrink-0">{emotion.emoji}</span>
+                              <span className="truncate">{emotion.title}</span>
+                            </div>
+                          )}
+                          {teacher.customNote && (
+                            <div className="flex items-center gap-1 text-[11px] text-natural-olive italic font-medium truncate bg-natural-soft-bg/80 px-1.5 py-0.5 rounded border border-natural-border/50">
+                              <span className="shrink-0 font-normal">✍️</span>
+                              <span className="truncate">"{teacher.customNote}"</span>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 mt-0.5 text-[10px] text-natural-text/50">
@@ -156,7 +167,7 @@ export default function TeacherList({
                   </div>
 
                   {/* Right: Reset Button (only if check existing) */}
-                  {emotion && (
+                  {(emotion || teacher.customNote) && (
                     <button
                       id={`reset_teacher_emotion_${teacher.id}`}
                       onClick={(e) => {
@@ -164,7 +175,7 @@ export default function TeacherList({
                         onResetEmotion(teacher.id);
                       }}
                       className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-lg transition-all shrink-0 ml-1 cursor-pointer"
-                      title="이 감정 비우기"
+                      title="이 감정/상태 비우기"
                     >
                       <Trash2 size={13} />
                     </button>
