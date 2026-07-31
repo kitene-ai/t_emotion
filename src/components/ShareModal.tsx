@@ -19,27 +19,53 @@ export default function ShareModal({ isOpen, onClose, teacherNames }: ShareModal
   const longUrl = getUrlWithRoster(teacherNames);
 
   useEffect(() => {
-    if (isOpen && !tinyUrl) {
-      // Auto-fetch TinyURL for clean base url
-      fetchTinyUrl(baseUrl);
+    if (isOpen) {
+      // Auto-fetch short URL for clean base URL
+      fetchShortUrl(baseUrl);
     }
-  }, [isOpen]);
+  }, [isOpen, baseUrl]);
 
-  const fetchTinyUrl = async (targetUrl: string) => {
+  const fetchShortUrl = async (targetUrl: string) => {
     setIsLoadingTiny(true);
+    let cleanTarget = targetUrl.trim();
+    if (!cleanTarget.startsWith('http')) {
+      cleanTarget = window.location.origin;
+    }
+
     try {
-      const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(targetUrl)}`);
-      if (res.ok) {
-        const short = await res.text();
-        if (short && short.startsWith('http')) {
-          setTinyUrl(short.trim());
+      // Try 1: is.gd JSON API
+      const isGdRes = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(cleanTarget)}`);
+      if (isGdRes.ok) {
+        const data = await isGdRes.json();
+        if (data && data.shorturl && data.shorturl.startsWith('http')) {
+          setTinyUrl(data.shorturl.trim());
+          setIsLoadingTiny(false);
+          return;
         }
       }
     } catch (e) {
-      console.warn('TinyURL fetch error:', e);
-    } finally {
-      setIsLoadingTiny(false);
+      console.warn('is.gd shortener error:', e);
     }
+
+    try {
+      // Try 2: tinyurl via CORS proxy
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(cleanTarget)}`)}`;
+      const tinyRes = await fetch(proxyUrl);
+      if (tinyRes.ok) {
+        const text = await tinyRes.text();
+        if (text && text.trim().startsWith('http')) {
+          setTinyUrl(text.trim());
+          setIsLoadingTiny(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('TinyURL proxy error:', e);
+    }
+
+    // Fallback: Use clean base URL
+    setTinyUrl(cleanTarget);
+    setIsLoadingTiny(false);
   };
 
   const copyToClipboard = (text: string, type: string) => {

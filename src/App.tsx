@@ -167,10 +167,6 @@ export default function App() {
   useEffect(() => {
     if (!selectedDate) return;
 
-    // Load teacher names list
-    const storedNames = localStorage.getItem('emotion_board_teacher_names');
-    const activeNames = storedNames ? JSON.parse(storedNames) : DEFAULT_TEACHERS;
-
     // Load current emotions check-ins for this specific date
     const storedState = localStorage.getItem(`emotion_board_state_${selectedDate}`);
     let stateMap: Record<string, any> = {};
@@ -182,30 +178,38 @@ export default function App() {
       }
     }
 
-    // Combine names and loaded emotions into Teacher objects
-    const loadedTeachers: Teacher[] = activeNames.map((name: string, index: number) => {
-      const item = stateMap[name];
-      if (typeof item === 'string') {
-        return {
-          id: `teacher_${index}_${name}`,
-          name,
-          currentEmotionId: item
-        };
-      } else if (item && typeof item === 'object') {
-        return {
-          id: `teacher_${index}_${name}`,
-          name,
-          currentEmotionId: item.emotionId,
-          customNote: item.customNote
-        };
+    setTeachers((prevTeachers) => {
+      // Determine list of teacher names: use existing teachers in memory if present,
+      // otherwise fallback to localStorage or default
+      let namesToUse = prevTeachers.map((t) => t.name);
+      if (namesToUse.length === 0) {
+        const storedNames = localStorage.getItem('emotion_board_teacher_names');
+        namesToUse = storedNames ? JSON.parse(storedNames) : DEFAULT_TEACHERS;
       }
-      return {
-        id: `teacher_${index}_${name}`,
-        name
-      };
+
+      return namesToUse.map((name: string, index: number) => {
+        const item = stateMap[name];
+        if (typeof item === 'string') {
+          return {
+            id: `teacher_${index}_${name}`,
+            name,
+            currentEmotionId: item
+          };
+        } else if (item && typeof item === 'object') {
+          return {
+            id: `teacher_${index}_${name}`,
+            name,
+            currentEmotionId: item.emotionId,
+            customNote: item.customNote
+          };
+        }
+        return {
+          id: `teacher_${index}_${name}`,
+          name
+        };
+      });
     });
 
-    setTeachers(loadedTeachers);
     setSelectedTeacherId(null);
 
     // Load local history feed for today
@@ -459,6 +463,11 @@ export default function App() {
   };
 
   const handleShareLink = () => {
+    const currentNames = teachers.map(t => t.name);
+    if (currentNames.length > 0) {
+      localStorage.setItem('emotion_board_teacher_names', JSON.stringify(currentNames));
+      saveRosterToCloud(currentNames);
+    }
     setIsShareModalOpen(true);
   };
 
