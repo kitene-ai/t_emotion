@@ -41,7 +41,7 @@ export default function EmotionBoard({
 
   const handleSaveNoteOnly = () => {
     if (!selectedTeacherId) return;
-    onSelectEmotion(currentSelectedIds, noteInput.trim());
+    onSelectEmotion(currentSelectedIds, noteInput.trim(), true);
   };
 
   const handleCardClick = (emotionId: string) => {
@@ -79,42 +79,45 @@ export default function EmotionBoard({
       {/* Target Teacher Prompt banner */}
       <div className="mb-3 sm:mb-4">
         {selectedTeacher ? (
-          <div className="flex items-center gap-2.5 p-3 bg-natural-light-sage/40 border border-natural-sage/30 rounded-xl text-left animate-fade-in justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="text-lg sm:text-xl">👉</span>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-emerald-50/80 border-2 border-emerald-200/90 rounded-2xl text-left animate-fade-in shadow-xs">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <span className="text-2xl sm:text-3xl shrink-0 animate-bounce">👉</span>
               <div>
-                <div className="text-xs font-bold text-natural-deep-green">
-                  <span className="text-natural-deep-green underline decoration-natural-sand font-extrabold text-sm">{selectedTeacher.name} 선생님</span>의 감정을 선택하는 중입니다.
+                <div className="text-xs sm:text-sm font-bold text-natural-deep-green">
+                  <span className="text-natural-deep-green underline decoration-emerald-500 font-black text-sm sm:text-base">{selectedTeacher.name} 선생님</span>의 감정을 선택하는 중입니다.
                 </div>
-                <p className="text-[10px] text-natural-text/60 mt-0.5">
-                  감정 이모티콘을 터치하면 여러 개를 동시에 등록하거나 취소할 수 있습니다.
+                <p className="text-[10px] sm:text-xs text-natural-text/70 mt-0.5">
+                  감정 이모티콘 선택 후 <strong className="text-emerald-700 font-black underline">[최종 제출]</strong> 버튼을 누르면 구글 시트에 기록됩니다.
                 </p>
               </div>
             </div>
-            {currentSelectedIds.length > 0 && (
-              <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                <span className="text-[11px] font-bold bg-natural-sand text-white px-2.5 py-1 rounded-full shadow-xs">
+            
+            <div className="flex items-center gap-2 shrink-0 justify-end flex-wrap mt-1 sm:mt-0">
+              {currentSelectedIds.length > 0 && (
+                <span className="text-xs sm:text-sm font-black bg-emerald-200/80 text-emerald-900 border border-emerald-400 px-3 py-1.5 rounded-xl shadow-2xs">
                   {currentSelectedIds.length}개 선택됨
                 </span>
-                <button
-                  id="submit_final_emotions_btn"
-                  onClick={() => onSelectEmotion(currentSelectedIds, noteInput.trim(), true)}
-                  className="text-[10px] font-bold text-white bg-natural-deep-green hover:bg-natural-olive px-2.5 py-1 rounded-full shadow-xs transition-colors cursor-pointer flex items-center gap-1"
-                  title="선택한 감정을 지금 즉시 구글 시트에 최종 제출"
-                >
-                  <Check size={11} />
-                  <span>최종 제출</span>
-                </button>
+              )}
+              <button
+                id="submit_final_emotions_btn"
+                onClick={() => onSelectEmotion(currentSelectedIds, noteInput.trim(), true)}
+                className="text-xs sm:text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer flex items-center gap-1.5 ring-2 ring-emerald-400 animate-pulse"
+                title="선택한 감정을 지금 즉시 구글 시트에 최종 제출"
+              >
+                <Check size={18} className="stroke-[3]" />
+                <span>최종 제출</span>
+              </button>
+              {currentSelectedIds.length > 0 && (
                 <button
                   id="deselect_all_emotions_btn"
                   onClick={() => onSelectEmotion([], noteInput.trim(), true)}
-                  className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded-full transition-colors cursor-pointer"
+                  className="text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl transition-all cursor-pointer shadow-2xs"
                   title="선택한 감정 모두 해제"
                 >
                   선택 해제 ✕
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex items-center gap-2.5 p-3 bg-natural-soft-bg/50 border border-natural-border rounded-xl text-left">
@@ -258,6 +261,39 @@ export default function EmotionBoard({
           })}
         </div>
       </div>
+
+      {/* Floating Sticky Submit Bar when emotions or custom note are selected */}
+      {selectedTeacher && (currentSelectedIds.length > 0 || noteInput.trim()) && (
+        <div className="sticky bottom-0 z-20 mt-3 p-3 sm:p-4 bg-white/95 backdrop-blur-md border-2 border-emerald-500/90 rounded-2xl shadow-xl flex items-center justify-between gap-3 animate-slide-up">
+          <div className="text-left min-w-0">
+            <div className="text-xs sm:text-sm font-black text-emerald-950 truncate flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+              <span>{selectedTeacher.name} 선생님: {currentSelectedIds.length}개 감정 선택 완료</span>
+            </div>
+            <p className="text-[10px] sm:text-xs text-natural-text/70 truncate mt-0.5">
+              버튼을 누르면 구글 시트에 최종 기록됩니다!
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              id="sticky_submit_final_emotions_btn"
+              onClick={() => onSelectEmotion(currentSelectedIds, noteInput.trim(), true)}
+              className="text-xs sm:text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl shadow-lg hover:shadow-xl transition-all transform active:scale-95 cursor-pointer flex items-center gap-2 ring-2 ring-emerald-400"
+            >
+              <Check size={18} className="stroke-[3]" />
+              <span>최종 제출하기</span>
+            </button>
+            <button
+              id="sticky_deselect_btn"
+              onClick={() => onSelectEmotion([], noteInput.trim(), true)}
+              className="text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-300 px-3 py-2 sm:py-2.5 rounded-xl transition-all cursor-pointer shrink-0"
+              title="해제"
+            >
+              해제 ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

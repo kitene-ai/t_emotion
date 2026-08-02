@@ -504,12 +504,9 @@ export default function App() {
     if (isFinalSubmit) {
       commitFinalToSheetsAndLogs();
     } else {
-      // Debounce Google Sheets sync by 1.5 seconds so rapid taps record only the final selection once
-      setSyncStatus('syncing');
-      setSyncMessage(`${teacher.name} 선생님 감정 선택 중... (1.5초 후 구글 시트에 최종 기록)`);
-      sheetSyncTimerRef.current[teacher.name] = setTimeout(() => {
-        commitFinalToSheetsAndLogs();
-      }, 1500);
+      // Do not automatically record to Google Sheets on simple card click
+      setSyncStatus('idle');
+      setSyncMessage(`${teacher.name} 선생님의 감정이 선택되었습니다. [최종 제출] 버튼을 누르면 구글 시트에 기록됩니다.`);
     }
   };
 
