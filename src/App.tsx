@@ -699,15 +699,18 @@ export default function App() {
           </div>
         )}
 
-        {/* Warning if Google login expired */}
-        {isSessionExpired && syncStatus === 'idle' && (
-          <div className="mb-4 p-4 rounded-xl border border-natural-border bg-natural-soft-bg text-natural-text flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+        {/* Warning if Google login expired (Only shown if GAS URL is not active, and clearly labeled for Manager) */}
+        {isSessionExpired && !gasUrl && syncStatus === 'idle' && (
+          <div className="mb-4 p-4 rounded-xl border border-natural-sand/30 bg-natural-soft-bg text-natural-text flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
             <div className="flex items-center gap-2.5 text-left">
               <AlertCircle size={18} className="text-natural-sand shrink-0" />
               <div>
-                <h4 className="text-xs font-bold text-natural-olive">구글 스프레드시트 로그인이 해제되었습니다!</h4>
-                <p className="text-[10px] text-natural-text/70 mt-0.5">
-                  감정 체크 결과가 구글 시트에 안전하게 누가기록 되지 않을 수 있습니다. 1초 만에 다시 연동하세요.
+                <h4 className="text-xs font-bold text-natural-olive flex items-center gap-1.5">
+                  <span className="bg-natural-sand text-white text-[10px] px-2 py-0.5 rounded-md font-extrabold">개설자/관리자 전용</span>
+                  구글 스프레드시트 직연동 계정 재인증 필요
+                </h4>
+                <p className="text-[10px] text-natural-text/70 mt-1">
+                  ※ 연수에 참여하는 선생님들은 로그인 없이도 감정 체크가 바로 전달됩니다. (개설자 선생님만 1초 재연동 진행)
                 </p>
               </div>
             </div>
