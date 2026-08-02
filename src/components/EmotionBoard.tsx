@@ -1,12 +1,12 @@
 import { Emotion, Teacher } from '../types';
 import { EMOTIONS, CATEGORIES } from '../data/emotions';
 import { useState, useEffect } from 'react';
-import { Smile, AlertCircle, Sparkles, MessageSquarePlus, Send } from 'lucide-react';
+import { Smile, AlertCircle, Sparkles, MessageSquarePlus, Send, Check } from 'lucide-react';
 
 interface EmotionBoardProps {
   selectedTeacherId: string | null;
   teachers: Teacher[];
-  onSelectEmotion: (emotionIds: string[], customNote?: string) => void;
+  onSelectEmotion: (emotionIds: string[], customNote?: string, isFinalSubmit?: boolean) => void;
 }
 
 type CategoryFilter = 'all' | 'positive' | 'exhausted' | 'funny' | 'realistic' | 'focused';
@@ -92,13 +92,22 @@ export default function EmotionBoard({
               </div>
             </div>
             {currentSelectedIds.length > 0 && (
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                 <span className="text-[11px] font-bold bg-natural-sand text-white px-2.5 py-1 rounded-full shadow-xs">
                   {currentSelectedIds.length}개 선택됨
                 </span>
                 <button
+                  id="submit_final_emotions_btn"
+                  onClick={() => onSelectEmotion(currentSelectedIds, noteInput.trim(), true)}
+                  className="text-[10px] font-bold text-white bg-natural-deep-green hover:bg-natural-olive px-2.5 py-1 rounded-full shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                  title="선택한 감정을 지금 즉시 구글 시트에 최종 제출"
+                >
+                  <Check size={11} />
+                  <span>최종 제출</span>
+                </button>
+                <button
                   id="deselect_all_emotions_btn"
-                  onClick={() => onSelectEmotion([], noteInput.trim())}
+                  onClick={() => onSelectEmotion([], noteInput.trim(), true)}
                   className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded-full transition-colors cursor-pointer"
                   title="선택한 감정 모두 해제"
                 >

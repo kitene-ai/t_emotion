@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import TeacherList from './components/TeacherList';
 import EmotionBoard from './components/EmotionBoard';
@@ -58,6 +58,9 @@ export default function App() {
   const [recentLogs, setRecentLogs] = useState<LogItem[]>([]);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [syncMessage, setSyncMessage] = useState<string>('');
+
+  // Debounce ref for Google Sheets & Recent Activity sync to record final choices only
+  const sheetSyncTimerRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   // 1. Initialize Date & Load local/cloud configurations
   useEffect(() => {
@@ -364,7 +367,7 @@ export default function App() {
   };
 
   // 4. Update Emotion / Custom Note Event Handler
-  const handleSelectEmotion = async (emotionInput?: string | string[], customNote?: string) => {
+  const handleSelectEmotion = async (emotionInput?: string | string[], customNote?: string, isFinalSubmit: boolean = false) => {
     if (!selectedTeacherId) return;
 
     const teacher = teachers.find(t => t.id === selectedTeacherId);
@@ -381,11 +384,8 @@ export default function App() {
     }
 
     const currentEmotionId = emotionIds.length > 0 ? emotionIds[0] : undefined;
-    const selectedEmotions = emotionIds
-      .map(id => EMOTIONS.find(e => e.id === id))
-      .filter((e): e is Emotion => e !== undefined);
 
-    // A. Update local teachers state
+    // A. Update local teachers state immediately (so UI updates instantly)
     const updatedTeachers = teachers.map(t => {
       if (t.id === selectedTeacherId) {
         return {
@@ -399,7 +399,7 @@ export default function App() {
     });
     setTeachers(updatedTeachers);
 
-    // B. Save today's map to localStorage & Firestore Cloud
+    // B. Save today's map to localStorage & Firestore Cloud immediately (real-time전광판 updates instantly)
     const stateMap: Record<string, { emotionId?: string; emotionIds?: string[]; customNote?: string }> = {};
     updatedTeachers.forEach(t => {
       const ids = t.emotionIds && t.emotionIds.length > 0 ? t.emotionIds : (t.currentEmotionId ? [t.currentEmotionId] : []);
@@ -413,80 +413,103 @@ export default function App() {
     });
     localStorage.setItem(`emotion_board_state_${selectedDate}`, JSON.stringify(stateMap));
 
-    // Save to Firestore cloud database in real-time
     saveDailyStateToCloud(selectedDate, teacher.name, {
       emotionId: currentEmotionId,
       emotionIds,
       customNote
     });
 
-    // C. Add to live activity feed
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
+    // C. Commit function to send ONLY the final selected state to Google Sheets & Recent Activity Feed
+    const commitFinalToSheetsAndLogs = () => {
+      const selectedEmotions = emotionIds
+        .map(id => EMOTIONS.find(e => e.id === id))
+        .filter((e): e is Emotion => e !== undefined);
 
-    const emoji = selectedEmotions.length > 0
-      ? selectedEmotions.map(e => e.emoji).join(' ')
-      : (customNote ? '✍️' : '❌');
-    const emotionTitle = selectedEmotions.length > 0
-      ? selectedEmotions.map(e => e.title).join(', ')
-      : (customNote ? '주관식 한마디 기록' : '선택 해제됨');
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
 
-    const newLogItem: LogItem = {
-      id: `log_${Date.now()}_${teacher.name}`,
-      teacherName: teacher.name,
-      emoji,
-      emotionTitle,
-      customNote: customNote || undefined,
-      time: timeString
+      const emoji = selectedEmotions.length > 0
+        ? selectedEmotions.map(e => e.emoji).join(' ')
+        : (customNote ? '✍️' : '❌');
+      const emotionTitle = selectedEmotions.length > 0
+        ? selectedEmotions.map(e => e.title).join(', ')
+        : (customNote ? '주관식 한마디 기록' : '선택 해제됨');
+
+      const newLogItem: LogItem = {
+        id: `log_${Date.now()}_${teacher.name}`,
+        teacherName: teacher.name,
+        emoji,
+        emotionTitle,
+        customNote: customNote || undefined,
+        time: timeString
+      };
+
+      setRecentLogs((prevLogs) => {
+        const updated = [...prevLogs, newLogItem];
+        localStorage.setItem(`emotion_board_logs_${selectedDate}`, JSON.stringify(updated));
+        return updated;
+      });
+
+      let description = selectedEmotions.map(e => `${e.title}(${e.description})`).join(' / ');
+      if (customNote) {
+        description = description ? `${description} (customNote: ${customNote})` : `customNote: ${customNote}`;
+      } else if (selectedEmotions.length === 0) {
+        description = '감정 선택이 해제(삭제) 되었습니다.';
+      }
+
+      // Sync to Google Sheets via GAS Web App
+      if (gasUrl) {
+        setSyncStatus('syncing');
+        setSyncMessage(`${teacher.name} 선생님 최종 감정 구글 시트(GAS) 기록 중...`);
+
+        sendToGasWebhook(gasUrl, {
+          date: selectedDate,
+          time: timeString,
+          teacherName: teacher.name,
+          emoji,
+          emotionTitle,
+          emotionDescription: description
+        }).then((success) => {
+          if (success) {
+            setSyncStatus('success');
+            setSyncMessage(selectedEmotions.length > 0 || customNote ? `스프레드시트(GAS)에 최종 감정 기록 완료! (${emoji})` : `스프레드시트(GAS)에 감정 해제 기록 완료!`);
+            setTimeout(() => setSyncStatus('idle'), 3000);
+          }
+        });
+      }
+
+      // Direct Google Sheets API append if logged in & spreadsheetId configured
+      if (sheetConfig.spreadsheetId && googleToken) {
+        appendEmotionRecord(googleToken, sheetConfig.spreadsheetId, {
+          date: selectedDate,
+          time: timeString,
+          teacherName: teacher.name,
+          emoji,
+          emotionTitle,
+          emotionDescription: description
+        }).catch((err) => console.warn('Direct sheet append fallback error:', err));
+      }
     };
 
-    const updatedLogs = [...recentLogs, newLogItem];
-    setRecentLogs(updatedLogs);
-    localStorage.setItem(`emotion_board_logs_${selectedDate}`, JSON.stringify(updatedLogs));
-
-    let description = selectedEmotions.map(e => `${e.title}(${e.description})`).join(' / ');
-    if (customNote) {
-      description = description ? `${description} (주관식: ${customNote})` : `주관식: ${customNote}`;
-    } else if (selectedEmotions.length === 0) {
-      description = '감정 선택이 해제(삭제) 되었습니다.';
+    // Clear previous pending timer for this teacher
+    if (sheetSyncTimerRef.current[teacher.name]) {
+      clearTimeout(sheetSyncTimerRef.current[teacher.name]);
     }
 
-    // D. Sync to Google Sheets via GAS Web App (works for ALL participants on mobile/web without login!)
-    if (gasUrl) {
+    if (isFinalSubmit) {
+      commitFinalToSheetsAndLogs();
+    } else {
+      // Debounce Google Sheets sync by 1.5 seconds so rapid taps record only the final selection once
       setSyncStatus('syncing');
-      setSyncMessage(`${teacher.name} 선생님 감정 구글 시트(GAS) 기록 중...`);
-
-      sendToGasWebhook(gasUrl, {
-        date: selectedDate,
-        time: timeString,
-        teacherName: teacher.name,
-        emoji,
-        emotionTitle,
-        emotionDescription: description
-      }).then((success) => {
-        if (success) {
-          setSyncStatus('success');
-          setSyncMessage(selectedEmotions.length > 0 || customNote ? `스프레드시트(GAS)에 실시간 기록 완료!` : `스프레드시트(GAS)에 감정 해제 기록 완료!`);
-          setTimeout(() => setSyncStatus('idle'), 3000);
-        }
-      });
-    }
-
-    // E. Direct Google Sheets API append if logged in & spreadsheetId configured
-    if (sheetConfig.spreadsheetId && googleToken) {
-      appendEmotionRecord(googleToken, sheetConfig.spreadsheetId, {
-        date: selectedDate,
-        time: timeString,
-        teacherName: teacher.name,
-        emoji,
-        emotionTitle,
-        emotionDescription: description
-      }).catch((err) => console.warn('Direct sheet append fallback error:', err));
+      setSyncMessage(`${teacher.name} 선생님 감정 선택 중... (1.5초 후 구글 시트에 최종 기록)`);
+      sheetSyncTimerRef.current[teacher.name] = setTimeout(() => {
+        commitFinalToSheetsAndLogs();
+      }, 1500);
     }
   };
 
