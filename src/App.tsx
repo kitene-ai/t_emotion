@@ -425,9 +425,14 @@ export default function App() {
         .map(id => EMOTIONS.find(e => e.id === id))
         .filter((e): e is Emotion => e !== undefined);
 
-      const effectiveNote = (customNote !== undefined && customNote !== null)
+      let effectiveNote = (customNote !== undefined && customNote !== null)
         ? customNote.trim()
         : (teacher.customNote ? teacher.customNote.trim() : '');
+
+      // Sanitize legacy placeholder text
+      if (effectiveNote === '주관식 한마디 기록' || effectiveNote === '주관식 한마디') {
+        effectiveNote = '';
+      }
 
       const now = new Date();
       const timeString = now.toLocaleTimeString('ko-KR', {
@@ -441,9 +446,20 @@ export default function App() {
         ? (effectiveNote ? `${selectedEmotions.map(e => e.emoji).join(' ')} ✍️` : selectedEmotions.map(e => e.emoji).join(' '))
         : (effectiveNote ? '✍️' : '❌');
 
-      const emotionTitle = selectedEmotions.length > 0
-        ? (effectiveNote ? `${selectedEmotions.map(e => e.title).join(', ')} (주관식: ${effectiveNote})` : selectedEmotions.map(e => e.title).join(', '))
-        : (effectiveNote ? effectiveNote : '선택 해제됨');
+      let emotionTitle = '';
+      if (selectedEmotions.length > 0) {
+        const titles = selectedEmotions.map(e => e.title).join(', ');
+        emotionTitle = effectiveNote ? `${titles} (✍️ 주관식: ${effectiveNote})` : titles;
+      } else {
+        emotionTitle = effectiveNote ? effectiveNote : '선택 해제됨';
+      }
+
+      let description = selectedEmotions.map(e => `${e.title}(${e.description})`).join(' / ');
+      if (effectiveNote) {
+        description = description ? `${description} / ✍️ 주관식: ${effectiveNote}` : effectiveNote;
+      } else if (selectedEmotions.length === 0) {
+        description = '감정 선택이 해제(삭제) 되었습니다.';
+      }
 
       const newLogItem: LogItem = {
         id: `log_${Date.now()}_${teacher.name}`,
@@ -459,13 +475,6 @@ export default function App() {
         localStorage.setItem(`emotion_board_logs_${selectedDate}`, JSON.stringify(updated));
         return updated;
       });
-
-      let description = selectedEmotions.map(e => `${e.title}(${e.description})`).join(' / ');
-      if (effectiveNote) {
-        description = description ? `${description} / 주관식: ${effectiveNote}` : effectiveNote;
-      } else if (selectedEmotions.length === 0) {
-        description = '감정 선택이 해제(삭제) 되었습니다.';
-      }
 
       // Sync to Google Sheets via GAS Web App
       if (gasUrl) {

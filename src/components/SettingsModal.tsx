@@ -401,6 +401,45 @@ export default function SettingsModal({
                     앱스크립트 웹앱 주소 저장 및 전체 클라우드 공유
                   </button>
                 </div>
+
+                <details className="mt-2 text-left bg-white/80 rounded-xl border border-natural-border p-3 text-xs">
+                  <summary className="font-bold text-natural-olive cursor-pointer hover:underline flex items-center justify-between">
+                    <span>💡 직접 구글 앱스크립트(GAS) 만들어서 연결하는 법 (클릭)</span>
+                  </summary>
+                  <div className="mt-2 space-y-2 text-[11px] text-natural-text/80 leading-relaxed border-t border-natural-border/50 pt-2">
+                    <p>
+                      <strong>1. 구글 시트 상단 메뉴:</strong> [확장 프로그램] ➔ [Apps Script] 클릭<br />
+                      <strong>2. 아래 코드를 전체 복사하여 붙여넣기:</strong>
+                    </p>
+                    <pre className="bg-gray-800 text-green-300 p-2 rounded text-[10px] overflow-x-auto font-mono select-all">
+{`function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var data = JSON.parse(e.postData.contents);
+    
+    // 타임스탬프, 이름, 이모티콘, 감정제목/주관식, 세부설명
+    var timestamp = data.date + " " + data.time;
+    var name = data.teacherName || "";
+    var emoji = data.emoji || "";
+    var emotionTitle = data.emotionTitle || "";
+    var description = data.emotionDescription || "";
+    
+    sheet.appendRow([timestamp, name, emoji, emotionTitle, description]);
+    
+    return ContentService.createTextOutput("SUCCESS")
+      .setMimeType(ContentService.MimeType.TEXT);
+  } catch(err) {
+    return ContentService.createTextOutput("ERROR: " + err.message);
+  }
+}`}
+                    </pre>
+                    <p>
+                      <strong>3. 배포하기:</strong> [배포] ➔ [새 배포] ➔ 유형: [웹 앱]<br />
+                      • 액세스 권한: <strong>모든 사용자 (Anyone)</strong> 설정 필수!<br />
+                      • 배포 후 생성된 URL을 위 입력창에 넣고 저장하세요.
+                    </p>
+                  </div>
+                </details>
               </div>
 
               {/* 1. Auth Status */}
