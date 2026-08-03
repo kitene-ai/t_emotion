@@ -425,6 +425,10 @@ export default function App() {
         .map(id => EMOTIONS.find(e => e.id === id))
         .filter((e): e is Emotion => e !== undefined);
 
+      const effectiveNote = (customNote !== undefined && customNote !== null)
+        ? customNote.trim()
+        : (teacher.customNote ? teacher.customNote.trim() : '');
+
       const now = new Date();
       const timeString = now.toLocaleTimeString('ko-KR', {
         hour: '2-digit',
@@ -434,18 +438,19 @@ export default function App() {
       });
 
       const emoji = selectedEmotions.length > 0
-        ? selectedEmotions.map(e => e.emoji).join(' ')
-        : (customNote ? '✍️' : '❌');
+        ? (effectiveNote ? `${selectedEmotions.map(e => e.emoji).join(' ')} ✍️` : selectedEmotions.map(e => e.emoji).join(' '))
+        : (effectiveNote ? '✍️' : '❌');
+
       const emotionTitle = selectedEmotions.length > 0
-        ? selectedEmotions.map(e => e.title).join(', ')
-        : (customNote ? '주관식 한마디 기록' : '선택 해제됨');
+        ? (effectiveNote ? `${selectedEmotions.map(e => e.title).join(', ')} (주관식: ${effectiveNote})` : selectedEmotions.map(e => e.title).join(', '))
+        : (effectiveNote ? effectiveNote : '선택 해제됨');
 
       const newLogItem: LogItem = {
         id: `log_${Date.now()}_${teacher.name}`,
         teacherName: teacher.name,
         emoji,
         emotionTitle,
-        customNote: customNote || undefined,
+        customNote: effectiveNote || undefined,
         time: timeString
       };
 
@@ -456,8 +461,8 @@ export default function App() {
       });
 
       let description = selectedEmotions.map(e => `${e.title}(${e.description})`).join(' / ');
-      if (customNote) {
-        description = description ? `${description} (customNote: ${customNote})` : `customNote: ${customNote}`;
+      if (effectiveNote) {
+        description = description ? `${description} / 주관식: ${effectiveNote}` : effectiveNote;
       } else if (selectedEmotions.length === 0) {
         description = '감정 선택이 해제(삭제) 되었습니다.';
       }
@@ -477,7 +482,7 @@ export default function App() {
         }).then((success) => {
           if (success) {
             setSyncStatus('success');
-            setSyncMessage(selectedEmotions.length > 0 || customNote ? `스프레드시트(GAS)에 최종 감정 기록 완료! (${emoji})` : `스프레드시트(GAS)에 감정 해제 기록 완료!`);
+            setSyncMessage(selectedEmotions.length > 0 || effectiveNote ? `스프레드시트(GAS)에 최종 감정 기록 완료! (${emoji})` : `스프레드시트(GAS)에 감정 해제 기록 완료!`);
             setTimeout(() => setSyncStatus('idle'), 3000);
           }
         });

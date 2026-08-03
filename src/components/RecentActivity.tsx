@@ -47,7 +47,7 @@ export default function RecentActivity({ logs }: RecentActivityProps) {
                       "{log.emotionTitle}"
                     </span>
                   </div>
-                  {log.customNote && (
+                  {log.customNote && log.customNote !== log.emotionTitle && (
                     <div className="text-[11px] text-natural-deep-green italic font-medium mt-0.5 truncate">
                       ✍️ "{log.customNote}"
                     </div>
